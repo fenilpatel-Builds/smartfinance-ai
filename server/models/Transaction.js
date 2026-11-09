@@ -19,6 +19,10 @@ const transactionSchema = new mongoose.Schema(
       ref: 'Statement',
       index: true,
     },
+    importBatchId: {
+      type: String,
+      index: true,
+    },
     transactionDate: {
       type: Date,
       required: true,

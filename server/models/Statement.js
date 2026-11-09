@@ -55,6 +55,10 @@ const statementSchema = new mongoose.Schema(
       type: Number,
       default: 0,
     },
+    importBatchId: {
+      type: String,
+      index: true,
+    },
     processingStatus: {
       type: String,
       enum: ['UPLOADED', 'PARSING', 'PREVIEW_READY', 'IMPORTED', 'FAILED'],

@@ -18,6 +18,15 @@ import { BalanceSheetPage } from './pages/reports/BalanceSheetPage';
 import { ReportsPage } from './pages/reports/ReportsPage';
 import { AIInsightsPage } from './pages/ai/AIInsightsPage';
 import { SettingsPage } from './pages/settings/SettingsPage';
+import { GoalsPage } from './pages/goals/GoalsPage';
+import { SubscriptionsPage } from './pages/subscriptions/SubscriptionsPage';
+import { InvoicesPage } from './pages/invoices/InvoicesPage';
+import { LoansPage } from './pages/loans/LoansPage';
+import { ForecastPage } from './pages/forecast/ForecastPage';
+import { HealthScorePage } from './pages/health/HealthScorePage';
+import { AnomaliesPage } from './pages/anomalies/AnomaliesPage';
+import { DocumentVaultPage } from './pages/vault/DocumentVaultPage';
+import { CalendarPage } from './pages/calendar/CalendarPage';
 
 function App() {
   return (
@@ -34,6 +43,15 @@ function App() {
           <Route path="/banks" element={<BankAccountsPage />} />
           <Route path="/upload" element={<StatementsUploadPage />} />
           <Route path="/transactions" element={<TransactionsPage />} />
+          <Route path="/invoices" element={<InvoicesPage />} />
+          <Route path="/loans" element={<LoansPage />} />
+          <Route path="/forecast" element={<ForecastPage />} />
+          <Route path="/health-score" element={<HealthScorePage />} />
+          <Route path="/goals" element={<GoalsPage />} />
+          <Route path="/subscriptions" element={<SubscriptionsPage />} />
+          <Route path="/anomalies" element={<AnomaliesPage />} />
+          <Route path="/calendar" element={<CalendarPage />} />
+          <Route path="/vault" element={<DocumentVaultPage />} />
           <Route path="/categories" element={<CategoriesPage />} />
           <Route path="/consolidation" element={<ConsolidationPage />} />
           <Route path="/reconciliation" element={<ReconciliationPage />} />

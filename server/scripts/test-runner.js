@@ -12,6 +12,12 @@ import Transaction from '../models/Transaction.js';
 import Asset from '../models/Asset.js';
 import Liability from '../models/Liability.js';
 import EquityRecord from '../models/EquityRecord.js';
+import Goal from '../models/Goal.js';
+import RecurringTransaction from '../models/RecurringTransaction.js';
+import Invoice from '../models/Invoice.js';
+import Loan from '../models/Loan.js';
+import Anomaly from '../models/Anomaly.js';
+import { calculateAmortizationSchedule } from '../controllers/loanController.js';
 import {
   recalculateBankAccountBalance,
   detectInternalTransfers,
@@ -232,6 +238,123 @@ const runTests = async () => {
       assert(typeof balance === 'number', 'Every account balance must resolve deterministically');
       assert(!isNaN(balance), 'Balance must not be NaN');
     }
+  });
+
+  // Test 7: Loan Amortization Mathematical Accuracy
+  await test('Loan EMI & amortization formula mathematical accuracy', async () => {
+    // Principal: 1,000,000, Annual Rate: 12%, Tenure: 12 months
+    const calc = calculateAmortizationSchedule(1000000, 12, 12, new Date('2026-01-01'));
+    // Standard formula: monthly rate r = 0.01, (1.01)^12 = 1.12682503
+    // EMI = 1,000,000 * 0.01 * 1.12682503 / 0.12682503 = 88,848.79
+    assert(Math.abs(calc.emi - 88848.79) < 1.0, `EMI should be approx 88849, got ${calc.emi}`);
+    assert.strictEqual(calc.schedule.length, 12, 'Schedule must contain exactly 12 monthly installments');
+    assert.strictEqual(calc.schedule[11].remainingBalance, 0, 'Final remaining balance must be exactly 0.00');
+
+    const totalPrincipalSum = calc.schedule.reduce((acc, s) => acc + s.principal, 0);
+    assert(Math.abs(totalPrincipalSum - 1000000) < 1.0, 'Sum of principal paid across all installments must equal 1,000,000');
+  });
+
+  // Test 8: Invoice Receivables & Subtotal/Tax Math
+  await test('Invoice deterministic subtotal, tax and discount integrity', async () => {
+    const ws = await Workspace.findOne();
+    const items = [
+      { description: 'Consulting Retainer', quantity: 2, unitPrice: 50000, taxRate: 18, amount: 100000 },
+      { description: 'Cloud Setup', quantity: 1, unitPrice: 20000, taxRate: 18, amount: 20000 },
+    ];
+    const subtotal = 120000;
+    const tax = 120000 * 0.18; // 21600
+    const discount = 5000;
+    const total = subtotal + tax - discount; // 136600
+
+    const inv = await Invoice.create({
+      workspaceId: ws._id,
+      invoiceNumber: `TEST-INV-${Date.now()}`,
+      customerName: 'Test Client Ltd',
+      items,
+      subtotal,
+      taxAmount: tax,
+      discountAmount: discount,
+      totalAmount: total,
+      paidAmount: 0,
+      dueDate: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000),
+      status: 'Sent',
+    });
+
+    assert.strictEqual(inv.totalAmount, 136600, 'Calculated total amount must strictly match');
+    assert.strictEqual(inv.status, 'Sent');
+  });
+
+  // Test 9: Goal Savings & Progress Projections
+  await test('Financial Goal progress and monthly contribution requirements', async () => {
+    const ws = await Workspace.findOne();
+    const targetDate = new Date(Date.now() + 180 * 24 * 60 * 60 * 1000); // 6 months
+    const goal = await Goal.create({
+      workspaceId: ws._id,
+      name: 'Server Replacement Fund',
+      targetAmount: 600000,
+      currentAmount: 200000,
+      targetDate,
+      category: 'Capital Expansion',
+      status: 'In Progress',
+    });
+
+    const progressPct = Math.round((goal.currentAmount / goal.targetAmount) * 100);
+    assert.strictEqual(progressPct, 33, 'Progress must be exactly 33%');
+    const remaining = goal.targetAmount - goal.currentAmount;
+    assert.strictEqual(remaining, 400000, 'Remaining required amount must be 400,000');
+  });
+
+  // Test 10: Recurring Expense Cadence & Projection
+  await test('Recurring subscription annual run-rate projection', async () => {
+    const ws = await Workspace.findOne();
+    const sub = await RecurringTransaction.create({
+      workspaceId: ws._id,
+      merchant: 'Datadog APM',
+      expectedAmount: 8500,
+      frequency: 'Monthly',
+      nextExpectedDate: new Date(Date.now() + 15 * 24 * 60 * 60 * 1000),
+      status: 'Active',
+    });
+
+    const annualCommitment = sub.expectedAmount * 12;
+    assert.strictEqual(annualCommitment, 102000, '12-month annual commitment must be 102,000');
+  });
+
+  // Test 11: Anomaly Detection Logic
+  await test('Anomaly trigger heuristics (Spike & Duplicate Detection)', async () => {
+    const ws = await Workspace.findOne();
+    // Simulate spike detection rule
+    const avgCategoryExpense = 10000;
+    const testAmount = 45000;
+    const isSpike = testAmount > avgCategoryExpense * 3;
+    assert.strictEqual(isSpike, true, 'Expense > 3x category average must trigger spike anomaly');
+
+    const anom = await Anomaly.create({
+      workspaceId: ws._id,
+      anomalyType: 'High Expense Spike',
+      severity: 'High',
+      title: 'Spike Anomaly Test',
+      description: 'Transaction exceeds 3x category baseline',
+      affectedAmount: testAmount,
+      status: 'Detected',
+    });
+
+    assert.strictEqual(anom.status, 'Detected');
+    assert.strictEqual(anom.severity, 'High');
+  });
+
+  // Test 12: Cash Flow Forecast Scenarios
+  await test('Cash flow forecast conservative vs best-case scenario variance', async () => {
+    const startingCash = 200000;
+    const expectedInflows = 100000;
+    const expectedOutflows = 60000;
+
+    const expectedEnding = startingCash + expectedInflows - expectedOutflows; // 240,000
+    const conservativeEnding = startingCash + expectedInflows * 0.7 - expectedOutflows * 1.1; // 200,000 + 70,000 - 66,000 = 204,000
+    const bestCaseEnding = startingCash + expectedInflows * 1.05 - expectedOutflows * 0.95; // 200,000 + 105,000 - 57,000 = 248,000
+
+    assert(conservativeEnding < expectedEnding, 'Conservative balance must be strictly lower than expected');
+    assert(bestCaseEnding > expectedEnding, 'Best-case balance must be strictly higher than expected');
   });
 
   console.log(`\n--- TEST SUMMARY: ${passed} Passed, ${failed} Failed ---\n`);

@@ -1,6 +1,7 @@
 import dotenv from 'dotenv';
 dotenv.config();
 
+import crypto from 'crypto';
 import mongoose from 'mongoose';
 import bcrypt from 'bcryptjs';
 import { connectDB, closeDB } from '../config/db.js';
@@ -265,6 +266,11 @@ const seed = async () => {
         const debit = item.t === 'debit' ? item.amt : 0;
         const credit = item.t === 'credit' ? item.amt : 0;
         running = running + credit - debit;
+        const fp = crypto
+          .createHash('sha256')
+          .update(`${item.d}|${item.amt.toFixed(2)}|${item.t}|${(item.ref || item.desc || '').slice(0, 25)}`)
+          .digest('hex');
+
         return {
           workspaceId: workspace._id,
           bankAccountId: accountDoc._id,
@@ -284,6 +290,7 @@ const seed = async () => {
           reconciliationStatus: 'Matched',
           verificationStatus: 'Verified',
           categorizationSource: 'auto_rule',
+          fingerprint: fp,
         };
       });
     };

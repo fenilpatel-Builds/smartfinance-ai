@@ -7,6 +7,8 @@ import {
   getStatements,
   getStatementPreview,
   confirmImport,
+  rollbackImport,
+  reprocessStatement,
   deleteStatement,
 } from '../controllers/statementController.js';
 import { protect } from '../middleware/auth.js';
@@ -61,6 +63,16 @@ router.post(
   '/:id/confirm-import',
   requireRoles('Super Admin', 'Workspace Owner', 'Finance Manager', 'Accountant'),
   confirmImport
+);
+router.post(
+  '/:id/rollback',
+  requireRoles('Super Admin', 'Workspace Owner', 'Finance Manager'),
+  rollbackImport
+);
+router.post(
+  '/:id/reprocess',
+  requireRoles('Super Admin', 'Workspace Owner', 'Finance Manager', 'Accountant'),
+  reprocessStatement
 );
 router.delete('/:id', requireRoles('Super Admin', 'Workspace Owner'), deleteStatement);
 

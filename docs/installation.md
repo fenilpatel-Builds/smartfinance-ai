@@ -63,7 +63,21 @@ You can also click the **"Workspace Owner"** or **"Accountant"** quick-fill butt
 
 ---
 
-## 4. OCR Setup (Optional)
+## 4. Docker Deployment (Single Command)
+
+To run the complete production stack (MongoDB, Python Service, Node.js Backend, React Nginx Frontend) in isolated Docker containers:
+
+```bash
+docker-compose up --build -d
+```
+
+- React Client: `http://localhost`
+- Node.js Backend: `http://localhost:5000`
+- Python Service: `http://localhost:8000`
+
+---
+
+## 5. OCR Setup (Optional)
 If you wish to parse scanned image bank statements:
 - **Windows**: Download Tesseract OCR from [UB Mannheim Tesseract Installer](https://github.com/UB-Mannheim/tesseract/wiki) and set `TESSERACT_CMD` in `python-service/.env`.
 - Standard digital PDF, Excel, and CSV statements do not require Tesseract OCR.

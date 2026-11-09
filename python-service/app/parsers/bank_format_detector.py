@@ -35,6 +35,14 @@ BANK_SIGNATURES = {
     "Punjab National Bank": [
         r"punjab\s*national\s*bank",
         r"punb0"
+    ],
+    "Canara Bank": [
+        r"canara\s*bank",
+        r"cnrb0"
+    ],
+    "Union Bank of India": [
+        r"union\s*bank",
+        r"ubin0"
     ]
 }
 

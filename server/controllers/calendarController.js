@@ -7,8 +7,8 @@ export const getFinancialCalendarEvents = async (req, res, next) => {
     const workspaceId = req.workspace._id;
     const { month, year } = req.query;
 
-    const targetYear = parseInt(year, 10) || new Date().getFullYear();
-    const targetMonth = parseInt(month, 10) !== undefined ? parseInt(month, 10) : new Date().getMonth();
+    const targetYear = year ? parseInt(year, 10) : new Date().getFullYear();
+    const targetMonth = month !== undefined && month !== '' ? parseInt(month, 10) : new Date().getMonth();
 
     const startDate = new Date(targetYear, targetMonth, 1);
     const endDate = new Date(targetYear, targetMonth + 1, 0, 23, 59, 59, 999);

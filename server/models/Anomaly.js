@@ -12,22 +12,17 @@ const anomalySchema = new mongoose.Schema(
       type: mongoose.Schema.Types.ObjectId,
       ref: 'Transaction',
     },
+    bankAccountId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'BankAccount',
+    },
     anomalyType: {
       type: String,
-      enum: [
-        'Unusually Large Amount',
-        'Sudden Spending Surge',
-        'Duplicate Risk',
-        'Unusual Counterparty',
-        'Unexpected Recurring Spike',
-        'Balance Jump Discrepancy',
-      ],
       required: true,
     },
     severity: {
       type: String,
-      enum: ['low', 'medium', 'high', 'critical'],
-      default: 'medium',
+      default: 'Medium',
     },
     title: {
       type: String,
@@ -41,10 +36,20 @@ const anomalySchema = new mongoose.Schema(
       type: Number,
       default: 0.0,
     },
+    confidenceScore: {
+      type: Number,
+      default: 0.85,
+    },
     status: {
       type: String,
-      enum: ['Pending Review', 'Confirmed Anomaly', 'Dismissed as Normal'],
-      default: 'Pending Review',
+      default: 'Detected',
+    },
+    resolvedAt: {
+      type: Date,
+    },
+    resolutionNotes: {
+      type: String,
+      default: '',
     },
     flaggedAt: {
       type: Date,

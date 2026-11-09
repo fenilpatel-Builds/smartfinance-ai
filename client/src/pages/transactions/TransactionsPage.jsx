@@ -39,6 +39,14 @@ export const TransactionsPage = () => {
   const [selectedTxIds, setSelectedTxIds] = useState([]);
   const [bulkCategory, setBulkCategory] = useState('');
 
+  // Split Transaction Modal
+  const [showSplitModal, setShowSplitModal] = useState(false);
+  const [splitTx, setSplitTx] = useState(null);
+  const [splits, setSplits] = useState([
+    { categoryName: '', amount: '', notes: '' },
+    { categoryName: '', amount: '', notes: '' },
+  ]);
+
   // Add Manual Tx Modal
   const [showAddModal, setShowAddModal] = useState(false);
   const [newTx, setNewTx] = useState({
@@ -150,6 +158,34 @@ export const TransactionsPage = () => {
     const wsId = localStorage.getItem('currentWorkspaceId');
     const url = `/api/v1/transactions/export?format=${format}&workspaceId=${wsId}&token=${token}`;
     window.open(url, '_blank');
+  };
+
+  const openSplitModal = (tx) => {
+    setSplitTx(tx);
+    const half = Math.round((tx.amount / 2) * 100) / 100;
+    setSplits([
+      { categoryName: tx.categoryName || 'General', amount: String(half), notes: 'Portion 1' },
+      { categoryName: 'Other Expenses', amount: String(Math.round((tx.amount - half) * 100) / 100), notes: 'Portion 2' },
+    ]);
+    setShowSplitModal(true);
+  };
+
+  const handleSplitSubmit = async (e) => {
+    e.preventDefault();
+    if (!splitTx) return;
+    try {
+      const formattedSplits = splits.map((s) => ({
+        categoryName: s.categoryName,
+        amount: parseFloat(s.amount) || 0,
+        notes: s.notes,
+      }));
+      await api.post(`/transactions/${splitTx._id}/split`, { splits: formattedSplits });
+      setShowSplitModal(false);
+      setSplitTx(null);
+      fetchTransactions();
+    } catch (err) {
+      alert(err.response?.data?.message || 'Split failed');
+    }
   };
 
   const handleAddTx = async (e) => {
@@ -393,12 +429,21 @@ export const TransactionsPage = () => {
                     )}
                   </td>
                   <td className="p-3 text-right whitespace-nowrap">
-                    <button
-                      onClick={() => handleDelete(t._id)}
-                      className="p-1 text-slate-400 hover:text-rose-600 rounded"
-                    >
-                      <Trash2 className="h-3.5 w-3.5" />
-                    </button>
+                    <div className="flex items-center justify-end gap-1">
+                      <button
+                        onClick={() => openSplitModal(t)}
+                        className="rounded px-2 py-0.5 text-[10px] font-semibold text-brand-600 bg-brand-50 hover:bg-brand-100 dark:bg-brand-950/50 dark:text-brand-300"
+                        title="Split Transaction"
+                      >
+                        Split
+                      </button>
+                      <button
+                        onClick={() => handleDelete(t._id)}
+                        className="p-1 text-slate-400 hover:text-rose-600 rounded"
+                      >
+                        <Trash2 className="h-3.5 w-3.5" />
+                      </button>
+                    </div>
                   </td>
                 </tr>
               ))}
@@ -540,6 +585,101 @@ export const TransactionsPage = () => {
                   className="rounded-lg bg-brand-600 px-4 py-2 text-xs font-semibold text-white shadow-sm hover:bg-brand-500"
                 >
                   Save Transaction
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Modal: Split Transaction */}
+      {showSplitModal && splitTx && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 p-4 backdrop-blur-sm">
+          <div className="w-full max-w-lg rounded-2xl bg-white p-6 shadow-xl dark:bg-slate-900 border border-slate-200 dark:border-slate-800">
+            <div className="flex items-center justify-between border-b border-slate-100 pb-3 dark:border-slate-800">
+              <div>
+                <h3 className="text-base font-bold text-slate-900 dark:text-white">Split Transaction</h3>
+                <p className="text-xs text-slate-400">
+                  Total Transaction Amount: ₹{splitTx.amount.toLocaleString()} ({splitTx.description})
+                </p>
+              </div>
+              <button
+                onClick={() => setShowSplitModal(false)}
+                className="rounded p-1 text-slate-400 hover:text-slate-600"
+              >
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+
+            <form onSubmit={handleSplitSubmit} className="mt-4 space-y-3">
+              {splits.map((s, idx) => (
+                <div key={idx} className="flex items-center gap-2">
+                  <input
+                    type="text"
+                    required
+                    placeholder="Category allocation"
+                    value={s.categoryName}
+                    onChange={(e) => {
+                      const updated = [...splits];
+                      updated[idx].categoryName = e.target.value;
+                      setSplits(updated);
+                    }}
+                    className="flex-1 rounded-lg border border-slate-200 px-3 py-1.5 text-xs dark:border-slate-700 dark:bg-slate-800 dark:text-white"
+                  />
+                  <input
+                    type="number"
+                    step="any"
+                    required
+                    placeholder="Amount ₹"
+                    value={s.amount}
+                    onChange={(e) => {
+                      const updated = [...splits];
+                      updated[idx].amount = e.target.value;
+                      setSplits(updated);
+                    }}
+                    className="w-28 rounded-lg border border-slate-200 px-3 py-1.5 text-xs dark:border-slate-700 dark:bg-slate-800 dark:text-white"
+                  />
+                  <input
+                    type="text"
+                    placeholder="Notes"
+                    value={s.notes}
+                    onChange={(e) => {
+                      const updated = [...splits];
+                      updated[idx].notes = e.target.value;
+                      setSplits(updated);
+                    }}
+                    className="w-28 rounded-lg border border-slate-200 px-2 py-1.5 text-xs dark:border-slate-700 dark:bg-slate-800 dark:text-white"
+                  />
+                </div>
+              ))}
+
+              <div className="rounded-lg bg-slate-50 p-2.5 text-xs dark:bg-slate-800/50 flex justify-between font-semibold">
+                <span>Sum of Splits:</span>
+                <span
+                  className={
+                    Math.abs(splits.reduce((acc, s) => acc + (parseFloat(s.amount) || 0), 0) - splitTx.amount) < 0.05
+                      ? 'text-emerald-600'
+                      : 'text-rose-600'
+                  }
+                >
+                  ₹{splits.reduce((acc, s) => acc + (parseFloat(s.amount) || 0), 0).toLocaleString()} / ₹
+                  {splitTx.amount.toLocaleString()}
+                </span>
+              </div>
+
+              <div className="flex justify-end gap-2 pt-2 border-t border-slate-100 dark:border-slate-800">
+                <button
+                  type="button"
+                  onClick={() => setShowSplitModal(false)}
+                  className="rounded-lg px-3 py-1.5 text-xs font-semibold text-slate-600"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  className="rounded-lg bg-brand-600 px-4 py-1.5 text-xs font-semibold text-white shadow-sm hover:bg-brand-500"
+                >
+                  Save Split
                 </button>
               </div>
             </form>

@@ -197,6 +197,7 @@ export const confirmImport = async (req, res, next) => {
     const categories = await Category.find({ workspaceId: req.workspace._id });
     const categoryMap = new Map(categories.map((c) => [c.name.toLowerCase(), c._id]));
 
+    const batchId = `BATCH-${Date.now()}-${crypto.randomUUID().slice(0, 8)}`;
     const documentsToInsert = [];
 
     for (const item of transactionsToImport) {
@@ -251,6 +252,7 @@ export const confirmImport = async (req, res, next) => {
         workspaceId: req.workspace._id,
         bankAccountId: statement.bankAccountId,
         statementId: statement._id,
+        importBatchId: batchId,
         transactionDate: isNaN(txDate.getTime()) ? new Date() : txDate,
         description: item.description,
         normalizedDescription: item.normalizedDescription || item.description,
@@ -277,6 +279,7 @@ export const confirmImport = async (req, res, next) => {
     // Update statement status
     statement.processingStatus = 'IMPORTED';
     statement.importedTransactionCount = documentsToInsert.length;
+    statement.importBatchId = batchId;
     await statement.save();
 
     // Recalculate bank balance dynamically
@@ -359,6 +362,118 @@ export const deleteStatement = async (req, res, next) => {
     });
 
     res.json({ success: true, message: 'Statement deleted successfully' });
+  } catch (err) {
+    next(err);
+  }
+};
+
+export const rollbackImport = async (req, res, next) => {
+  try {
+    const statement = await Statement.findOne({
+      _id: req.params.id,
+      workspaceId: req.workspace._id,
+    });
+
+    if (!statement) {
+      return res.status(404).json({ success: false, message: 'Statement not found' });
+    }
+
+    if (statement.processingStatus !== 'IMPORTED') {
+      return res.status(400).json({ success: false, message: 'Only imported statements can be rolled back' });
+    }
+
+    // Delete all transactions linked to this statement / import batch
+    const deleteResult = await Transaction.deleteMany({
+      statementId: statement._id,
+      workspaceId: req.workspace._id,
+    });
+
+    statement.processingStatus = 'PREVIEW_READY';
+    statement.importedTransactionCount = 0;
+    statement.importBatchId = undefined;
+    await statement.save();
+
+    // Recalculate balance and internal transfers
+    await recalculateBankAccountBalance(statement.bankAccountId, req.workspace._id);
+    await detectInternalTransfers(req.workspace._id);
+
+    await logAudit({
+      workspaceId: req.workspace._id,
+      userId: req.user._id,
+      action: 'IMPORT_ROLLBACK',
+      entityType: 'Statement',
+      entityId: statement._id,
+      metadata: { rolledBackCount: deleteResult.deletedCount },
+    });
+
+    res.json({
+      success: true,
+      message: `Successfully rolled back ${deleteResult.deletedCount} transactions. Statement is reset to preview status.`,
+      rolledBackCount: deleteResult.deletedCount,
+    });
+  } catch (err) {
+    next(err);
+  }
+};
+
+export const reprocessStatement = async (req, res, next) => {
+  try {
+    const statement = await Statement.findOne({
+      _id: req.params.id,
+      workspaceId: req.workspace._id,
+    });
+
+    if (!statement) {
+      return res.status(404).json({ success: false, message: 'Statement not found' });
+    }
+
+    if (!statement.storedFilePath || !fs.existsSync(statement.storedFilePath)) {
+      return res.status(400).json({ success: false, message: 'Original statement file is no longer on disk' });
+    }
+
+    const { customMapping } = req.body;
+    let parsedMapping = customMapping || null;
+
+    statement.processingStatus = 'PARSING';
+    await statement.save();
+
+    const absolutePath = path.resolve(statement.storedFilePath);
+    const parsedData = await requestPythonExtraction(absolutePath, parsedMapping, statement.processingJobId);
+
+    statement.extractedDataCache = parsedData;
+    statement.processingStatus = 'PREVIEW_READY';
+    statement.extractedTransactionCount = parsedData.transactions?.length || 0;
+    statement.openingBalance = parsedData.summary?.openingBalance || 0;
+    statement.closingBalance = parsedData.summary?.closingBalance || 0;
+    statement.columnMappingRequired = !!parsedData.columnMappingRequired;
+    statement.availableHeaders = parsedData.availableHeaders || [];
+    statement.processingWarnings = parsedData.validation?.warnings || [];
+    statement.processingErrors = parsedData.validation?.errors || [];
+
+    if (parsedData.statementPeriod?.start) {
+      statement.statementPeriodStart = new Date(parsedData.statementPeriod.start);
+    }
+    if (parsedData.statementPeriod?.end) {
+      statement.statementPeriodEnd = new Date(parsedData.statementPeriod.end);
+    }
+
+    await statement.save();
+
+    res.json({
+      success: true,
+      message: 'Statement successfully reprocessed.',
+      statement: {
+        id: statement._id,
+        originalFileName: statement.originalFileName,
+        processingStatus: statement.processingStatus,
+        columnMappingRequired: statement.columnMappingRequired,
+        availableHeaders: statement.availableHeaders,
+        summary: parsedData.summary,
+        detectedBank: parsedData.detectedBank,
+        extractedTransactions: parsedData.transactions || [],
+        validation: parsedData.validation,
+      },
+    });
   } catch (err) {
     next(err);
   }

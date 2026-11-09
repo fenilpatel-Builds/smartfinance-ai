@@ -15,7 +15,6 @@ const recurringTransactionSchema = new mongoose.Schema(
     },
     title: {
       type: String,
-      required: true,
       trim: true,
     },
     merchant: {
@@ -26,9 +25,12 @@ const recurringTransactionSchema = new mongoose.Schema(
       type: String,
       default: 'Subscriptions',
     },
+    description: {
+      type: String,
+      trim: true,
+    },
     recurringType: {
       type: String,
-      enum: ['Subscription', 'Rent', 'EMI / Loan', 'Utility Bill', 'Insurance', 'Salary / Payroll', 'Vendor Payment'],
       default: 'Subscription',
     },
     expectedAmount: {
@@ -41,8 +43,8 @@ const recurringTransactionSchema = new mongoose.Schema(
     },
     frequency: {
       type: String,
-      enum: ['weekly', 'monthly', 'quarterly', 'yearly'],
-      default: 'monthly',
+      enum: ['daily', 'weekly', 'monthly', 'quarterly', 'yearly', 'Daily', 'Weekly', 'Bi-Weekly', 'Monthly', 'Quarterly', 'Yearly'],
+      default: 'Monthly',
     },
     lastPaymentDate: {
       type: Date,
@@ -73,6 +75,13 @@ const recurringTransactionSchema = new mongoose.Schema(
     timestamps: true,
   }
 );
+
+recurringTransactionSchema.pre('save', function (next) {
+  if (!this.title) {
+    this.title = this.merchant || this.description || 'Recurring Expense';
+  }
+  next();
+});
 
 recurringTransactionSchema.index({ workspaceId: 1, nextExpectedDate: 1 });
 

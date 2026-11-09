@@ -14,4 +14,8 @@ venv/
 ENV/
 .DS_Store
 Thumbs.db
+server/data/
+server/backups/
+*.lock
+
 

@@ -2,11 +2,21 @@ import mongoose from 'mongoose';
 
 const amortizationRowSchema = new mongoose.Schema({
   monthNumber: Number,
+  installmentNumber: Number,
   paymentDate: Date,
+  dueDate: Date,
   emi: Number,
   principalPaid: Number,
+  principal: Number,
   interestPaid: Number,
+  interest: Number,
   remainingPrincipal: Number,
+  remainingBalance: Number,
+  isPaid: {
+    type: Boolean,
+    default: false,
+  },
+  paidDate: Date,
 });
 
 const loanSchema = new mongoose.Schema(
@@ -17,6 +27,10 @@ const loanSchema = new mongoose.Schema(
       required: true,
       index: true,
     },
+    loanName: {
+      type: String,
+      trim: true,
+    },
     lenderName: {
       type: String,
       required: true,
@@ -24,7 +38,6 @@ const loanSchema = new mongoose.Schema(
     },
     loanType: {
       type: String,
-      enum: ['Term Loan', 'Working Capital Loan', 'Vehicle Loan', 'Mortgage / Home Loan', 'Personal Loan', 'Credit Line'],
       default: 'Term Loan',
     },
     accountNumber: {
@@ -38,7 +51,7 @@ const loanSchema = new mongoose.Schema(
     },
     annualInterestRate: {
       type: Number,
-      required: true, // e.g. 9.5 for 9.5%
+      required: true,
       min: 0,
     },
     tenureMonths: {
@@ -57,6 +70,14 @@ const loanSchema = new mongoose.Schema(
     remainingPrincipal: {
       type: Number,
       required: true,
+    },
+    totalInterestPayable: {
+      type: Number,
+      default: 0,
+    },
+    totalAmountPayable: {
+      type: Number,
+      default: 0,
     },
     currency: {
       type: String,
