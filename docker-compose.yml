@@ -1,7 +1,7 @@
 version: '3.8'
 
 services:
-  # MongoDB Database
+  # MongoDB Database 7.0
   mongodb:
     image: mongo:7.0
     container_name: smartfinance-mongo
@@ -12,6 +12,12 @@ services:
       - mongo_data:/data/db
     networks:
       - smartfinance-net
+    healthcheck:
+      test: ['CMD', 'mongosh', '--eval', 'db.runCommand("ping").ok']
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
 
   # Python Document Extraction & OCR Service
   python-engine:
@@ -27,6 +33,12 @@ services:
       - ENVIRONMENT=production
     networks:
       - smartfinance-net
+    healthcheck:
+      test: ['CMD', 'python', '-c', 'import urllib.request; urllib.request.urlopen("http://localhost:8000/health")']
+      interval: 15s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
 
   # Node.js Express Main Backend
   backend:
@@ -36,23 +48,35 @@ services:
     container_name: smartfinance-node-backend
     restart: unless-stopped
     depends_on:
-      - mongodb
-      - python-engine
+      mongodb:
+        condition: service_healthy
+      python-engine:
+        condition: service_healthy
     ports:
       - '5000:5000'
     environment:
       - PORT=5000
       - NODE_ENV=production
-      - MONGO_URI=mongodb://mongodb:27017/smartfinance
+      - MONGODB_URI=mongodb://mongodb:27017/smartfinance
       - PYTHON_SERVICE_URL=http://python-engine:8000
-      - JWT_SECRET=smartfinance_super_secret_production_jwt_key_2026
-      - CLIENT_URL=http://localhost
+      - JWT_SECRET=${JWT_SECRET:-smartfinance_super_secret_production_jwt_key_2026}
+      - JWT_REFRESH_SECRET=${JWT_REFRESH_SECRET:-smartfinance_super_secret_refresh_jwt_key_2026}
+      - VAULT_ENCRYPTION_KEY=${VAULT_ENCRYPTION_KEY:-super_secure_vault_aes_256_gcm_key_2026_prod}
+      - CLIENT_URL=${CLIENT_URL:-http://localhost}
+      - FILE_STORAGE_PATH=/app/uploads
+      - MAX_FILE_SIZE=25000000
     volumes:
       - backend_uploads:/app/uploads
     networks:
       - smartfinance-net
+    healthcheck:
+      test: ['CMD', 'node', '-e', 'import("http").then(h => h.get("http://localhost:5000/api/v1/health", r => process.exit(r.statusCode === 200 ? 0 : 1)))']
+      interval: 15s
+      timeout: 5s
+      retries: 3
+      start_period: 15s
 
-  # React Frontend Single Page App
+  # React Frontend Single Page App (Nginx)
   frontend:
     build:
       context: ./client
@@ -68,9 +92,11 @@ services:
 
 volumes:
   mongo_data:
+    name: smartfinance_mongo_data
   backend_uploads:
+    name: smartfinance_backend_uploads
 
 networks:
   smartfinance-net:
+    name: smartfinance_network
     driver: bridge
-

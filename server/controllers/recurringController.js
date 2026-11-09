@@ -1,5 +1,6 @@
 import RecurringTransaction from '../models/RecurringTransaction.js';
 import Transaction from '../models/Transaction.js';
+import BankAccount from '../models/BankAccount.js';
 import { logAudit } from '../utils/auditLogger.js';
 
 export const getRecurringTransactions = async (req, res, next) => {
@@ -55,6 +56,13 @@ export const createRecurringTransaction = async (req, res, next) => {
 
     if (!merchant || !expectedAmount) {
       return res.status(400).json({ success: false, message: 'Merchant and expected amount are required' });
+    }
+
+    if (bankAccountId) {
+      const bankAcc = await BankAccount.findOne({ _id: bankAccountId, workspaceId: req.workspace._id });
+      if (!bankAcc) {
+        return res.status(404).json({ success: false, message: 'Bank account not found in this workspace' });
+      }
     }
 
     const item = await RecurringTransaction.create({

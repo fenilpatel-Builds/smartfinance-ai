@@ -7,7 +7,7 @@ import Anomaly from '../models/Anomaly.js';
 import Budget from '../models/Budget.js';
 
 // Deterministic Currency Conversion Matrix (Base INR)
-const FX_RATES_TO_INR = {
+export const FX_RATES_TO_INR = {
   INR: 1.0,
   USD: 86.5,
   EUR: 91.2,
@@ -22,7 +22,14 @@ const FX_RATES_TO_INR = {
 export const getCurrencyRates = async (req, res, next) => {
   try {
     const base = req.query.base || 'INR';
-    const baseToInr = FX_RATES_TO_INR[base] || 1.0;
+    if (!FX_RATES_TO_INR[base.toUpperCase()]) {
+      return res.status(400).json({
+        success: false,
+        message: `Unsupported base currency '${base}'. Supported: ${Object.keys(FX_RATES_TO_INR).join(', ')}`,
+      });
+    }
+
+    const baseToInr = FX_RATES_TO_INR[base.toUpperCase()] || 1.0;
 
     const rates = {};
     for (const [curr, toInr] of Object.entries(FX_RATES_TO_INR)) {
@@ -31,9 +38,13 @@ export const getCurrencyRates = async (req, res, next) => {
 
     res.json({
       success: true,
-      base,
+      base: base.toUpperCase(),
       rates,
-      lastUpdated: new Date().toISOString(),
+      source: 'SmartFinance AI Reference FX Matrix',
+      isRealTime: false,
+      rateType: 'indicative_reference',
+      disclaimer: 'Exchange rates are indicative reference valuations for multi-currency reporting and do not constitute executable live FX trading quotes.',
+      lastUpdated: '2026-02-01T00:00:00.000Z',
     });
   } catch (err) {
     next(err);
@@ -45,11 +56,21 @@ export const convertCurrency = async (req, res, next) => {
     const { amount, from = 'USD', to = 'INR' } = req.body;
     const num = Number(amount);
     if (isNaN(num)) {
-      return res.status(400).json({ success: false, message: 'Valid amount is required' });
+      return res.status(400).json({ success: false, message: 'Valid numeric amount is required' });
     }
 
-    const fromRate = FX_RATES_TO_INR[from.toUpperCase()] || 1.0;
-    const toRate = FX_RATES_TO_INR[to.toUpperCase()] || 1.0;
+    const fromUpper = from.toUpperCase();
+    const toUpper = to.toUpperCase();
+
+    if (!FX_RATES_TO_INR[fromUpper] || !FX_RATES_TO_INR[toUpper]) {
+      return res.status(400).json({
+        success: false,
+        message: `Unsupported currency pair '${fromUpper}/${toUpper}'. Supported: ${Object.keys(FX_RATES_TO_INR).join(', ')}`,
+      });
+    }
+
+    const fromRate = FX_RATES_TO_INR[fromUpper];
+    const toRate = FX_RATES_TO_INR[toUpper];
 
     const inrValue = num * fromRate;
     const convertedAmount = Math.round((inrValue / toRate) * 100) / 100;
@@ -57,10 +78,14 @@ export const convertCurrency = async (req, res, next) => {
     res.json({
       success: true,
       originalAmount: num,
-      fromCurrency: from.toUpperCase(),
-      toCurrency: to.toUpperCase(),
+      fromCurrency: fromUpper,
+      toCurrency: toUpper,
       rate: Math.round((fromRate / toRate) * 10000) / 10000,
       convertedAmount,
+      source: 'SmartFinance AI Reference FX Matrix',
+      isRealTime: false,
+      rateType: 'indicative_reference',
+      lastUpdated: '2026-02-01T00:00:00.000Z',
     });
   } catch (err) {
     next(err);
@@ -176,7 +201,7 @@ export const getCashFlowForecast = async (req, res, next) => {
       success: true,
       forecast: {
         forecastDays: days,
-        startingBalance,
+        actualStartingBalance: startingBalance,
         totalProjectedInflow: Math.round(totalExpectedInflow * 100) / 100,
         totalProjectedOutflow: Math.round(totalExpectedOutflow * 100) / 100,
         netProjectedDelta,
@@ -184,6 +209,15 @@ export const getCashFlowForecast = async (req, res, next) => {
         timeline,
         scheduledInflowsCount: scheduledInflows.length,
         scheduledOutflowsCount: scheduledOutflows.length,
+        dataNotice:
+          scheduledInflows.length === 0 && scheduledOutflows.length === 0
+            ? 'Baseline projection: No scheduled invoices or recurring contracts detected for this window.'
+            : 'Multi-variable projection based on confirmed invoices, active recurring contracts, and scheduled loan EMIs.',
+        modelNotes: {
+          actualFigures: 'Starting balance sourced from reconciled bank accounts.',
+          contractualEstimates: 'Inflows and outflows based on stated invoice due dates and subscription cadences.',
+          scenarios: 'Conservative assumes 70% invoice realization and 10% expense overrun; Best-case assumes 100% on-time realization.',
+        },
       },
     });
   } catch (err) {
@@ -210,6 +244,7 @@ export const getFinancialHealthScore = async (req, res, next) => {
     const ninetyDaysAgo = new Date(Date.now() - 90 * 24 * 60 * 60 * 1000);
     const recentTxs = txs.filter((t) => new Date(t.transactionDate) >= ninetyDaysAgo);
 
+    const hasSufficientHistory = recentTxs.length >= 5;
     const totalIncome90 = recentTxs.filter((t) => t.transactionType === 'credit').reduce((a, b) => a + b.amount, 0);
     const totalExpense90 = recentTxs.filter((t) => t.transactionType === 'debit').reduce((a, b) => a + b.amount, 0);
 
@@ -286,6 +321,12 @@ export const getFinancialHealthScore = async (req, res, next) => {
       healthScore: {
         totalScore,
         grade,
+        hasSufficientHistory,
+        dataSufficiencyNotice: hasSufficientHistory
+          ? 'Calibrated on 90-day ledger history'
+          : 'Preliminary score: Workspace contains fewer than 5 transactions in the 90-day window.',
+        regulatoryDisclaimer:
+          'This score is an internal diagnostic heuristic model based on cash flow velocity and balance ratios. It is NOT an audited credit rating, official credit score, or regulated financial advisory report.',
         pillars: {
           savingsAndCashFlow: {
             score: savingsScore,

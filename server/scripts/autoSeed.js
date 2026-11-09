@@ -264,6 +264,14 @@ export default async function autoSeed() {
     amount: 500000,
   });
 
+  await EquityRecord.create({
+    workspaceId: workspace._id,
+    name: 'FY2025 Retained Earnings',
+    equityType: 'Retained Earnings',
+    amount: 92000,
+    effectiveDate: new Date('2025-12-31'),
+  });
+
   await AIInsight.create({
     workspaceId: workspace._id,
     insightType: 'spending_pattern',

@@ -27,6 +27,12 @@ def process_excel_statement(
     metadata_text = " ".join([str(val) for val in raw_df.values.flatten() if pd.notna(val)])
     
     detected_bank, confidence = detect_bank_from_text(metadata_text)
+    if detected_bank == "Generic Bank Statement":
+        import os
+        file_bank, file_conf = detect_bank_from_text(f"{os.path.basename(file_path)} {sheet_name}")
+        if file_bank != "Generic Bank Statement":
+            detected_bank, confidence = file_bank, file_conf
+
     metadata = extract_account_metadata(metadata_text)
 
     # Find the header row (row containing date, description/particulars, debit/credit/balance)

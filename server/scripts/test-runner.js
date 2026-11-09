@@ -210,11 +210,39 @@ const runTests = async () => {
     assert(bs.assets.total > 0, 'Total assets must be positive');
     assert(bs.liabilities.total > 0, 'Total liabilities must be calculated');
     assert(bs.equity.total > 0, 'Total equity must be calculated');
+    assert.strictEqual(bs.isEquationBalanced, true, `Balance sheet equation must balance (diff: ${bs.balanceDifference})`);
+    assert.strictEqual(bs.balanceDifference, 0, 'Equation difference must be exactly 0');
+    assert.strictEqual(bs.reconciliationStatus, 'BALANCED', 'Reconciliation status must be BALANCED');
 
     console.log(`    Total Assets: ₹${bs.assets.total.toLocaleString()}`);
     console.log(`    Total Liabilities: ₹${bs.liabilities.total.toLocaleString()}`);
     console.log(`    Total Equity: ₹${bs.equity.total.toLocaleString()}`);
     console.log(`    Equation Difference: ₹${bs.balanceDifference.toLocaleString()}`);
+    console.log(`    Status: ${bs.reconciliationStatus}`);
+  });
+
+  // Test 4b: Intentionally Unbalanced Dataset Rejection
+  await test('Intentionally unbalanced dataset rejection (Never verify failed equation)', async () => {
+    const ws = await Workspace.findOne();
+    // Temporarily insert an un-offset asset of ₹50,000
+    const rogueAsset = await Asset.create({
+      workspaceId: ws._id,
+      name: 'Unbalanced Mystery Asset',
+      assetType: 'Other Assets',
+      amount: 50000,
+    });
+
+    const unbalancedBs = await calculateCompleteBalanceSheet(ws._id);
+    assert.strictEqual(unbalancedBs.isEquationBalanced, false, 'Unbalanced dataset must NOT be marked as balanced');
+    assert.strictEqual(unbalancedBs.reconciliationStatus, 'DISCREPANCY_DETECTED');
+    assert.strictEqual(unbalancedBs.balanceDifference, 50000, 'Difference must reflect exact rogue amount ₹50,000');
+
+    // Clean up temporary rogue asset
+    await Asset.deleteOne({ _id: rogueAsset._id });
+
+    // Verify balance is restored
+    const restoredBs = await calculateCompleteBalanceSheet(ws._id);
+    assert.strictEqual(restoredBs.isEquationBalanced, true, 'Balance must be restored after removing rogue asset');
   });
 
   // Test 5: Duplicate Transaction Detection & Fingerprinting
@@ -355,6 +383,104 @@ const runTests = async () => {
 
     assert(conservativeEnding < expectedEnding, 'Conservative balance must be strictly lower than expected');
     assert(bestCaseEnding > expectedEnding, 'Best-case balance must be strictly higher than expected');
+  });
+
+  // Test 13: Strict Multi-Tenant Isolation Across Workspaces
+  await test('Multi-tenant workspace isolation across all models', async () => {
+    const primaryWs = await Workspace.findOne({ slug: 'patel-global-enterprises' });
+    assert(primaryWs, 'Primary workspace must exist');
+
+    // Create a secondary isolated competitor workspace
+    const competitorWs = await Workspace.create({
+      name: 'Competitor Ventures Inc',
+      slug: `comp-ventures-${Date.now()}`,
+      ownerId: primaryWs.ownerId,
+      currency: 'USD',
+    });
+
+    // Query models using competitor workspaceId
+    const competitorAccounts = await BankAccount.find({ workspaceId: competitorWs._id });
+    const competitorTxs = await Transaction.find({ workspaceId: competitorWs._id });
+    const competitorInvoices = await Invoice.find({ workspaceId: competitorWs._id });
+    const competitorGoals = await Goal.find({ workspaceId: competitorWs._id });
+    const competitorLoans = await Loan.find({ workspaceId: competitorWs._id });
+
+    assert.strictEqual(competitorAccounts.length, 0, 'Competitor workspace must not see primary bank accounts');
+    assert.strictEqual(competitorTxs.length, 0, 'Competitor workspace must not see primary transactions');
+    assert.strictEqual(competitorInvoices.length, 0, 'Competitor workspace must not see primary invoices');
+    assert.strictEqual(competitorGoals.length, 0, 'Competitor workspace must not see primary goals');
+    assert.strictEqual(competitorLoans.length, 0, 'Competitor workspace must not see primary loans');
+
+    // Clean up competitor workspace
+    await Workspace.deleteOne({ _id: competitorWs._id });
+  });
+
+  // Test 14: Document Vault AES-256-GCM Encryption & Tamper Detection
+  await test('Document Vault AES-256-GCM encryption, decryption and tamper detection', async () => {
+    const fs = await import('fs');
+    const path = await import('path');
+    const { encryptVaultFile, decryptVaultFile } = await import('../utils/vaultEncryption.js');
+
+    const tempDir = path.resolve('./uploads/test_vault');
+    if (!fs.existsSync(tempDir)) fs.mkdirSync(tempDir, { recursive: true });
+
+    const sampleContent = 'SmartFinance AI Confidential Financial Agreement 2026';
+    const plainPath = path.join(tempDir, `sample_${Date.now()}.txt`);
+    fs.writeFileSync(plainPath, sampleContent, 'utf8');
+
+    // Encrypt
+    const encResult = await encryptVaultFile(plainPath);
+    assert(fs.existsSync(encResult.storedFilePath), 'Encrypted file must be created on disk');
+    assert(!fs.existsSync(plainPath), 'Unencrypted plaintext file must be removed');
+    assert.strictEqual(encResult.algorithm, 'aes-256-gcm');
+    assert(encResult.iv && encResult.authTag, 'IV and Auth Tag must be produced');
+
+    // Decrypt and verify exact match
+    const decryptedBuffer = decryptVaultFile(encResult.storedFilePath, encResult.iv, encResult.authTag);
+    assert.strictEqual(decryptedBuffer.toString('utf8'), sampleContent, 'Decrypted content must match original plaintext');
+
+    // Tamper test: corrupt the ciphertext and verify authentication failure
+    const tamperedPath = `${encResult.storedFilePath}.tampered`;
+    const encryptedBytes = fs.readFileSync(encResult.storedFilePath);
+    encryptedBytes[0] = encryptedBytes[0] ^ 0xff; // flip bits
+    fs.writeFileSync(tamperedPath, encryptedBytes);
+
+    let caughtTamper = false;
+    try {
+      decryptVaultFile(tamperedPath, encResult.iv, encResult.authTag);
+    } catch (tamperErr) {
+      caughtTamper = true;
+    }
+    assert(caughtTamper, 'Tampered ciphertext must fail authentication and throw error');
+
+    // Clean up test files
+    if (fs.existsSync(encResult.storedFilePath)) fs.unlinkSync(encResult.storedFilePath);
+    if (fs.existsSync(tamperedPath)) fs.unlinkSync(tamperedPath);
+  });
+
+  // Test 15: FX Currency Matrix Calculation & Reciprocity
+  await test('FX currency conversion rates, matrix reciprocity and arithmetic accuracy', async () => {
+    const { FX_RATES_TO_INR } = await import('../controllers/financialIntelligenceController.js');
+    assert(FX_RATES_TO_INR.USD > 0, 'USD rate must be defined');
+    assert(FX_RATES_TO_INR.EUR > 0, 'EUR rate must be defined');
+    assert(FX_RATES_TO_INR.INR === 1.0, 'INR to INR rate must be exactly 1.0');
+
+    // 100 USD to INR
+    const inrAmount = 100 * FX_RATES_TO_INR.USD;
+    assert(inrAmount > 8000, '100 USD must be > 8000 INR');
+
+    // Convert back from INR to USD
+    const usdBack = inrAmount / FX_RATES_TO_INR.USD;
+    assert(Math.abs(usdBack - 100) < 0.001, 'Currency roundtrip must return original amount');
+  });
+
+  // Test 16: Negative Constraints & Fault-Tolerant Boundary Validation
+  await test('Loan amortization boundary validation (tenure & zero rates)', async () => {
+    // 0 interest rate scenario (e.g. interest-free loan)
+    const zeroInterestCalc = calculateAmortizationSchedule(120000, 0, 12, new Date('2026-01-01'));
+    assert.strictEqual(zeroInterestCalc.emi, 10000, '0% interest EMI for 120,000 over 12 months must be exactly 10,000');
+    assert.strictEqual(zeroInterestCalc.totalInterest, 0, 'Total interest must be 0');
+    assert.strictEqual(zeroInterestCalc.schedule[11].remainingBalance, 0, 'Remaining balance must reach 0');
   });
 
   console.log(`\n--- TEST SUMMARY: ${passed} Passed, ${failed} Failed ---\n`);

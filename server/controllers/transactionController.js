@@ -1,4 +1,5 @@
 import Transaction from '../models/Transaction.js';
+import BankAccount from '../models/BankAccount.js';
 import Category from '../models/Category.js';
 import ExcelJS from 'exceljs';
 import { recalculateBankAccountBalance } from '../services/financialEngine.js';
@@ -120,6 +121,11 @@ export const createTransaction = async (req, res, next) => {
 
     if (!bankAccountId || !transactionDate || !description || !amount || !transactionType) {
       return res.status(400).json({ success: false, message: 'Missing required transaction fields' });
+    }
+
+    const bankAccount = await BankAccount.findOne({ _id: bankAccountId, workspaceId: req.workspace._id });
+    if (!bankAccount) {
+      return res.status(404).json({ success: false, message: 'Bank account not found in this workspace' });
     }
 
     const amt = parseFloat(amount);

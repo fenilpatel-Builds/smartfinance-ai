@@ -15,7 +15,7 @@ const documentVaultSchema = new mongoose.Schema(
     },
     category: {
       type: String,
-      enum: ['Bank Statement', 'Invoice', 'Receipt', 'Tax Document', 'Loan Document', 'Financial Agreement', 'Other'],
+      enum: ['Bank Statement', 'Invoice', 'Receipt', 'Tax Document', 'Loan Document', 'Financial Agreement', 'Legal Contract', 'Contract', 'Audit Report', 'Other'],
       default: 'Receipt',
     },
     originalFileName: {
@@ -33,6 +33,26 @@ const documentVaultSchema = new mongoose.Schema(
     fileSize: {
       type: Number,
       default: 0,
+    },
+    fileHash: {
+      type: String,
+      trim: true,
+    },
+    isEncrypted: {
+      type: Boolean,
+      default: false,
+    },
+    encryptionAlgorithm: {
+      type: String,
+      default: 'aes-256-gcm',
+    },
+    encryptionIv: {
+      type: String,
+      trim: true,
+    },
+    encryptionAuthTag: {
+      type: String,
+      trim: true,
     },
     tags: [
       {

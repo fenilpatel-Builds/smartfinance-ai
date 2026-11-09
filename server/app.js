@@ -28,8 +28,12 @@ import financialIntelligenceRoutes from './routes/financialIntelligenceRoutes.js
 import calendarRoutes from './routes/calendarRoutes.js';
 
 import { notFound, errorHandler } from './middleware/errorHandler.js';
+import { requestId } from './middleware/requestId.js';
 
 const app = express();
+
+// Request correlation tracking
+app.use(requestId);
 
 // Security Middleware
 app.use(helmet({ crossOriginResourcePolicy: false }));
@@ -57,10 +61,17 @@ if (process.env.NODE_ENV !== 'test') {
 app.use(express.json({ limit: '30mb' }));
 app.use(express.urlencoded({ extended: true, limit: '30mb' }));
 
-// Health Check
-app.get('/health', (req, res) => {
-  res.json({ status: 'ok', service: 'SmartFinance AI Node.js Backend' });
-});
+// Health Checks
+const healthResponse = (req, res) => {
+  res.json({
+    status: 'ok',
+    service: 'SmartFinance AI Node.js Backend',
+    timestamp: new Date().toISOString(),
+    correlationId: req.id,
+  });
+};
+app.get('/health', healthResponse);
+app.get('/api/v1/health', healthResponse);
 
 // API Routes
 app.use('/api/v1/auth', authRoutes);

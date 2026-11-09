@@ -420,7 +420,7 @@ const seed = async () => {
       workspaceId: workspace._id,
       name: 'FY2025 Retained Earnings',
       equityType: 'Retained Earnings',
-      amount: 350000,
+      amount: 356500,
       effectiveDate: new Date('2025-12-31'),
     });
 

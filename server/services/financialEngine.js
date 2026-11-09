@@ -185,10 +185,22 @@ export const calculateCompleteBalanceSheet = async (workspaceId, asOfDate = new 
 
   const totalLiabilitiesAndEquity = Math.round((totalLiabilities + totalEquity) * 100) / 100;
   const balanceDifference = Math.round((totalAssets - totalLiabilitiesAndEquity) * 100) / 100;
-  const isEquationBalanced = Math.abs(balanceDifference) < 0.01;
+  const roundingTolerance = 0.01;
+  const isEquationBalanced = Math.abs(balanceDifference) <= roundingTolerance;
+
+  const reconciliationStatus = isEquationBalanced
+    ? 'BALANCED'
+    : 'DISCREPANCY_DETECTED';
+
+  const auditNote = isEquationBalanced
+    ? 'Accounting equation verified: Assets = Liabilities + Equity'
+    : `Balance sheet discrepancy detected: Assets (${totalAssets}) != Liabilities + Equity (${totalLiabilitiesAndEquity}). Difference: ₹${balanceDifference}`;
 
   return {
     asOfDate,
+    roundingTolerance,
+    reconciliationStatus,
+    auditNote,
     assets: {
       items: assetCategories,
       total: totalAssets,

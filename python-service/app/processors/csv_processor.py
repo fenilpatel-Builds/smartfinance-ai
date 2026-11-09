@@ -39,13 +39,15 @@ def process_csv_statement(
         pass
 
     # Read dataframe, find the header row by looking for date/particulars keywords
-    df = None
     header_idx = 0
     for idx in range(min(15, len(first_lines))):
         try:
             temp_df = pd.read_csv(file_path, skiprows=idx, nrows=5, sep=delimiter, engine="python")
             cols = [str(c).lower() for c in temp_df.columns]
-            if any("date" in c for c in cols) and (any("desc" in c or "narr" in c or "particular" in c for c in cols) or any("debit" in c or "amount" in c for c in cols)):
+            has_date = any("date" in c for c in cols)
+            has_desc = any(k in c for c in cols for k in ("desc", "narr", "particular", "remark", "detail", "memo"))
+            has_amount = any(k in c for c in cols for k in ("debit", "credit", "amount", "withdraw", "deposit", "balance", "dr", "cr"))
+            if has_date and (has_desc or has_amount):
                 header_idx = idx
                 break
         except Exception:

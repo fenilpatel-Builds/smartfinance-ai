@@ -3,6 +3,7 @@ import path from 'path';
 import crypto from 'crypto';
 import DocumentVault from '../models/DocumentVault.js';
 import { logAudit } from '../utils/auditLogger.js';
+import { encryptVaultFile, decryptVaultFile } from '../utils/vaultEncryption.js';
 
 export const getDocuments = async (req, res, next) => {
   try {
@@ -53,6 +54,9 @@ export const uploadDocument = async (req, res, next) => {
     const fileBuffer = fs.readFileSync(req.file.path);
     const hash = crypto.createHash('sha256').update(fileBuffer).digest('hex');
 
+    // Perform AES-256-GCM encryption at rest
+    const encResult = await encryptVaultFile(req.file.path);
+
     const parsedTags = typeof tags === 'string' ? tags.split(',').map((t) => t.trim()).filter(Boolean) : tags || [];
 
     const doc = await DocumentVault.create({
@@ -61,10 +65,14 @@ export const uploadDocument = async (req, res, next) => {
       title: title || req.file.originalname,
       category,
       originalFileName: req.file.originalname,
-      storedFilePath: req.file.path,
+      storedFilePath: encResult.storedFilePath,
       fileSize: req.file.size,
       mimeType: req.file.mimetype,
       fileHash: hash,
+      isEncrypted: true,
+      encryptionAlgorithm: encResult.algorithm,
+      encryptionIv: encResult.iv,
+      encryptionAuthTag: encResult.authTag,
       tags: parsedTags,
       notes: notes || '',
       linkedTransactionId: linkedTransactionId || undefined,
@@ -103,6 +111,18 @@ export const downloadDocument = async (req, res, next) => {
 
     res.setHeader('Content-Disposition', `attachment; filename="${encodeURIComponent(doc.originalFileName)}"`);
     res.setHeader('Content-Type', doc.mimeType);
+
+    if (doc.isEncrypted && doc.encryptionIv && doc.encryptionAuthTag) {
+      try {
+        const decryptedBuffer = decryptVaultFile(doc.storedFilePath, doc.encryptionIv, doc.encryptionAuthTag);
+        return res.send(decryptedBuffer);
+      } catch (decryptErr) {
+        return res.status(500).json({
+          success: false,
+          message: `Decryption or integrity verification failed: ${decryptErr.message}`,
+        });
+      }
+    }
 
     const fileStream = fs.createReadStream(doc.storedFilePath);
     fileStream.pipe(res);

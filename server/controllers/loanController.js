@@ -1,5 +1,6 @@
 import Loan from '../models/Loan.js';
 import Transaction from '../models/Transaction.js';
+import BankAccount from '../models/BankAccount.js';
 import { recalculateBankAccountBalance } from '../services/financialEngine.js';
 import { logAudit } from '../utils/auditLogger.js';
 
@@ -201,6 +202,11 @@ export const recordLoanPayment = async (req, res, next) => {
 
     // Optional: create debit transaction from bank account
     if (bankAccountId) {
+      const bankAcc = await BankAccount.findOne({ _id: bankAccountId, workspaceId: req.workspace._id });
+      if (!bankAcc) {
+        return res.status(404).json({ success: false, message: 'Bank account not found in this workspace' });
+      }
+
       await Transaction.create({
         workspaceId: req.workspace._id,
         bankAccountId,

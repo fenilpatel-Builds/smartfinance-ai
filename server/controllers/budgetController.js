@@ -60,6 +60,11 @@ export const createBudget = async (req, res, next) => {
       return res.status(400).json({ success: false, message: 'Category and budget amount are required' });
     }
 
+    const cat = await Category.findOne({ _id: categoryId, workspaceId: req.workspace._id });
+    if (!cat) {
+      return res.status(404).json({ success: false, message: 'Category not found in this workspace' });
+    }
+
     const budget = await Budget.create({
       workspaceId: req.workspace._id,
       categoryId,
