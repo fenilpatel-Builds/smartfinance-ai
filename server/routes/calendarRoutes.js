@@ -10,3 +10,4 @@ router.use(requireAuth, attachWorkspace);
 router.get('/events', requireWorkspacePermission('viewer'), getFinancialCalendarEvents);
 
 export default router;
+

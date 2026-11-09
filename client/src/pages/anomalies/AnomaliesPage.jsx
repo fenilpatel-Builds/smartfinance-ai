@@ -1,15 +1,17 @@
 import React, { useState, useEffect } from 'react';
 import {
-  AlertTriangle,
   ShieldAlert,
-  Sparkles,
+  AlertTriangle,
   CheckCircle2,
-  XCircle,
-  Clock,
-  Filter,
-  DollarSign,
-  ArrowRight,
   RefreshCw,
+  Search,
+  Filter,
+  Check,
+  X,
+  Clock,
+  Sparkles,
+  ArrowRight,
+  Eye,
 } from 'lucide-react';
 import api from '../../services/api';
 
@@ -18,15 +20,19 @@ export const AnomaliesPage = () => {
   const [metrics, setMetrics] = useState({});
   const [loading, setLoading] = useState(true);
   const [scanning, setScanning] = useState(false);
-  const [filterStatus, setFilterStatus] = useState('All');
-  const [filterSeverity, setFilterSeverity] = useState('All');
+  const [statusFilter, setStatusFilter] = useState('All');
+  const [severityFilter, setSeverityFilter] = useState('All');
+  const [selectedAnomaly, setSelectedAnomaly] = useState(null);
+  const [resolutionNotes, setResolutionNotes] = useState('');
+  const [resolvingStatus, setResolvingStatus] = useState('Resolved');
 
   const fetchAnomalies = async () => {
     try {
       setLoading(true);
       const params = {};
-      if (filterStatus !== 'All') params.status = filterStatus;
-      if (filterSeverity !== 'All') params.severity = filterSeverity;
+      if (statusFilter !== 'All') params.status = statusFilter;
+      if (severityFilter !== 'All') params.severity = severityFilter;
+
       const res = await api.get('/anomalies', { params });
       setAnomalies(res.data.anomalies || []);
       setMetrics(res.data.metrics || {});
@@ -39,9 +45,9 @@ export const AnomaliesPage = () => {
 
   useEffect(() => {
     fetchAnomalies();
-  }, [filterStatus, filterSeverity]);
+  }, [statusFilter, severityFilter]);
 
-  const handleRunScan = async () => {
+  const handleTriggerScan = async () => {
     try {
       setScanning(true);
       const res = await api.post('/anomalies/scan');
@@ -54,21 +60,20 @@ export const AnomaliesPage = () => {
     }
   };
 
-  const handleUpdateStatus = async (id, status) => {
+  const handleUpdateStatus = async (e) => {
+    e.preventDefault();
+    if (!selectedAnomaly) return;
     try {
-      await api.put(`/anomalies/${id}`, { status });
+      await api.patch(`/anomalies/${selectedAnomaly._id}`, {
+        status: resolvingStatus,
+        resolutionNotes,
+      });
+      setSelectedAnomaly(null);
+      setResolutionNotes('');
       fetchAnomalies();
     } catch (err) {
-      alert(err.response?.data?.message || 'Failed to update anomaly status');
+      alert(err.response?.data?.message || 'Failed to update anomaly');
     }
-  };
-
-  const getSeverityBadge = (sev) => {
-    const s = sev?.toLowerCase();
-    if (s === 'critical') return 'bg-red-50 text-red-700 border-red-200 dark:bg-red-950/60 dark:text-red-300';
-    if (s === 'high') return 'bg-orange-50 text-orange-700 border-orange-200 dark:bg-orange-950/60 dark:text-orange-300';
-    if (s === 'medium') return 'bg-amber-50 text-amber-700 border-amber-200 dark:bg-amber-950/60 dark:text-amber-300';
-    return 'bg-blue-50 text-blue-700 border-blue-200 dark:bg-blue-950/60 dark:text-blue-300';
   };
 
   return (
@@ -76,212 +81,253 @@ export const AnomaliesPage = () => {
       {/* Header */}
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <div className="flex items-center gap-2">
-            <h1 className="text-2xl font-bold tracking-tight text-slate-900 dark:text-white">
-              Financial Anomaly Detection Center
-            </h1>
-            <span className="inline-flex items-center rounded-full bg-red-50 px-2.5 py-0.5 text-xs font-medium text-red-700 dark:bg-red-950/60 dark:text-red-400">
-              Risk Guard
-            </span>
-          </div>
-          <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
-            Real-time heuristic & statistical audit of unusual spending surges, duplicate charges, and irregular frequencies.
+          <h1 className="text-xl font-bold tracking-tight text-slate-900 dark:text-white sm:text-2xl">
+            Financial Anomaly & Risk Detection
+          </h1>
+          <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
+            Automated transaction spike detection, duplicate charges, and irregular velocity monitoring
           </p>
         </div>
 
         <button
-          onClick={handleRunScan}
+          onClick={handleTriggerScan}
           disabled={scanning}
-          className="inline-flex items-center gap-2 rounded-xl bg-red-600 px-4 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-red-500 transition-all"
+          className="flex items-center gap-2 rounded-lg bg-rose-600 px-3.5 py-2 text-xs font-semibold text-white shadow-sm hover:bg-rose-500 disabled:opacity-50 cursor-pointer"
         >
-          <RefreshCw className={`h-4 w-4 ${scanning ? 'animate-spin' : ''}`} />
-          <span>{scanning ? 'Auditing Ledgers...' : 'Run Anomaly Scan'}</span>
+          <RefreshCw className={`h-3.5 w-3.5 ${scanning ? 'animate-spin' : ''}`} />
+          {scanning ? 'Scanning Transactions...' : 'Run Anomaly Scan'}
         </button>
+      </div>
+
+      {/* Fraud Disclaimer Alert */}
+      <div className="flex items-start gap-3 rounded-xl border border-amber-200 bg-amber-50/60 p-4 text-xs text-amber-900 dark:border-amber-900/60 dark:bg-amber-950/30 dark:text-amber-300">
+        <AlertTriangle className="h-4 w-4 shrink-0 text-amber-600 dark:text-amber-400 mt-0.5" />
+        <div>
+          <span className="font-semibold">Compliance Note:</span> Anomaly alerts represent statistical deviations (e.g. 3x category average, duplicate within 48h, high velocity). They are prioritized for internal audit review and do not constitute legal proof of fraud.
+        </div>
       </div>
 
       {/* KPI Cards */}
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-800 dark:bg-slate-900">
-          <div className="flex items-center justify-between">
-            <span className="text-xs font-medium uppercase tracking-wider text-slate-500">Total Flagged</span>
-            <div className="rounded-lg bg-slate-100 p-2 text-slate-600 dark:bg-slate-800 dark:text-slate-400">
-              <ShieldAlert className="h-4 w-4" />
-            </div>
-          </div>
-          <div className="mt-2 text-2xl font-bold text-slate-900 dark:text-white">
+        <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-xs dark:border-slate-800 dark:bg-slate-900">
+          <span className="text-xs font-medium text-slate-500 dark:text-slate-400">Total Flagged Anomalies</span>
+          <h2 className="text-2xl font-bold tracking-tight text-slate-900 dark:text-white mt-1">
             {metrics.totalDetected || 0}
-          </div>
-          <div className="mt-1 text-xs text-slate-500">Total detected pattern anomalies</div>
+          </h2>
+          <p className="text-[11px] text-slate-400 mt-1">Identified across all statements</p>
         </div>
 
-        <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-800 dark:bg-slate-900">
-          <div className="flex items-center justify-between">
-            <span className="text-xs font-medium uppercase tracking-wider text-slate-500">Critical Risks</span>
-            <div className="rounded-lg bg-red-50 p-2 text-red-600 dark:bg-red-950/50 dark:text-red-400">
-              <AlertTriangle className="h-4 w-4" />
-            </div>
-          </div>
-          <div className="mt-2 text-2xl font-bold text-red-600 dark:text-red-400">
-            {metrics.criticalCount || 0} Critical
-          </div>
-          <div className="mt-1 text-xs text-slate-500">Immediate auditor review required</div>
+        <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-xs dark:border-slate-800 dark:bg-slate-900">
+          <span className="text-xs font-medium text-slate-500 dark:text-slate-400">Critical Priority</span>
+          <h2 className="text-2xl font-bold tracking-tight text-rose-600 mt-1">
+            {metrics.criticalCount || 0}
+          </h2>
+          <p className="text-[11px] text-slate-400 mt-1">Requires immediate sign-off</p>
         </div>
 
-        <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-800 dark:bg-slate-900">
-          <div className="flex items-center justify-between">
-            <span className="text-xs font-medium uppercase tracking-wider text-slate-500">High Severity</span>
-            <div className="rounded-lg bg-orange-50 p-2 text-orange-600 dark:bg-orange-950/50 dark:text-orange-400">
-              <Clock className="h-4 w-4" />
-            </div>
-          </div>
-          <div className="mt-2 text-2xl font-bold text-orange-600 dark:text-orange-400">
-            {metrics.highCount || 0} High
-          </div>
-          <div className="mt-1 text-xs text-slate-500">Disproportionate balance impact</div>
+        <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-xs dark:border-slate-800 dark:bg-slate-900">
+          <span className="text-xs font-medium text-slate-500 dark:text-slate-400">High Risk Items</span>
+          <h2 className="text-2xl font-bold tracking-tight text-amber-600 mt-1">
+            {metrics.highCount || 0}
+          </h2>
+          <p className="text-[11px] text-slate-400 mt-1">Significant cost deviation</p>
         </div>
 
-        <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-800 dark:bg-slate-900">
-          <div className="flex items-center justify-between">
-            <span className="text-xs font-medium uppercase tracking-wider text-slate-500">Pending Review</span>
-            <div className="rounded-lg bg-amber-50 p-2 text-amber-600 dark:bg-amber-950/50 dark:text-amber-400">
-              <Clock className="h-4 w-4" />
-            </div>
-          </div>
-          <div className="mt-2 text-2xl font-bold text-amber-600 dark:text-amber-400">
-            {metrics.pendingReview || 0} Pending
-          </div>
-          <div className="mt-1 text-xs text-slate-500">Unresolved discrepancies</div>
+        <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-xs dark:border-slate-800 dark:bg-slate-900">
+          <span className="text-xs font-medium text-slate-500 dark:text-slate-400">Pending Investigation</span>
+          <h2 className="text-2xl font-bold tracking-tight text-indigo-600 dark:text-indigo-400 mt-1">
+            {metrics.pendingReview || 0}
+          </h2>
+          <p className="text-[11px] text-slate-400 mt-1">Awaiting review action</p>
         </div>
       </div>
 
-      {/* Filter Tabs */}
-      <div className="flex flex-wrap items-center justify-between gap-4">
-        <div className="flex items-center gap-1.5 rounded-xl bg-slate-100 p-1 dark:bg-slate-800">
-          {['All', 'Detected', 'Reviewed', 'Resolved', 'Dismissed'].map((status) => (
+      {/* Filters Bar */}
+      <div className="flex flex-wrap items-center gap-3">
+        <div className="flex items-center gap-2">
+          <span className="text-xs font-medium text-slate-500">Status:</span>
+          {['All', 'Detected', 'Investigating', 'Resolved', 'Dismissed'].map((st) => (
             <button
-              key={status}
-              onClick={() => setFilterStatus(status)}
-              className={`rounded-lg px-3 py-1.5 text-xs font-semibold transition-all ${
-                filterStatus === status
-                  ? 'bg-white text-slate-900 shadow-sm dark:bg-slate-700 dark:text-white'
-                  : 'text-slate-600 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white'
+              key={st}
+              onClick={() => setStatusFilter(st)}
+              className={`rounded-lg px-2.5 py-1 text-xs font-medium transition-colors ${
+                statusFilter === st
+                  ? 'bg-brand-600 text-white font-semibold'
+                  : 'bg-slate-100 text-slate-600 hover:bg-slate-200 dark:bg-slate-800 dark:text-slate-300'
               }`}
             >
-              {status}
+              {st}
             </button>
           ))}
         </div>
 
-        <div className="flex items-center gap-2">
-          <span className="text-xs text-slate-500">Severity:</span>
-          <select
-            value={filterSeverity}
-            onChange={(e) => setFilterSeverity(e.target.value)}
-            className="rounded-xl border border-slate-200 px-3 py-1.5 text-xs text-slate-900 focus:border-brand-500 focus:outline-none dark:border-slate-700 dark:bg-slate-800 dark:text-white"
-          >
-            <option value="All">All Severities</option>
-            <option value="Critical">Critical</option>
-            <option value="High">High</option>
-            <option value="Medium">Medium</option>
-            <option value="Low">Low</option>
-          </select>
+        <div className="flex items-center gap-2 sm:ml-auto">
+          <span className="text-xs font-medium text-slate-500">Severity:</span>
+          {['All', 'Critical', 'High', 'Medium', 'Low'].map((sev) => (
+            <button
+              key={sev}
+              onClick={() => setSeverityFilter(sev)}
+              className={`rounded-lg px-2.5 py-1 text-xs font-medium transition-colors ${
+                severityFilter === sev
+                  ? 'bg-slate-900 text-white dark:bg-white dark:text-slate-900 font-semibold'
+                  : 'bg-slate-100 text-slate-600 hover:bg-slate-200 dark:bg-slate-800 dark:text-slate-300'
+              }`}
+            >
+              {sev}
+            </button>
+          ))}
         </div>
       </div>
 
       {/* Anomalies List */}
-      {loading ? (
-        <div className="flex h-48 items-center justify-center rounded-2xl border border-slate-200 bg-white dark:border-slate-800 dark:bg-slate-900">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-red-600"></div>
-        </div>
-      ) : anomalies.length === 0 ? (
-        <div className="rounded-2xl border border-dashed border-slate-300 bg-white p-12 text-center dark:border-slate-800 dark:bg-slate-900">
-          <CheckCircle2 className="mx-auto h-12 w-12 text-emerald-500" />
-          <h3 className="mt-4 text-base font-semibold text-slate-900 dark:text-white">Ledgers Clean & Reconciled</h3>
-          <p className="mt-1 text-sm text-slate-500">
-            No unreviewed anomalies match your current filters. Click "Run Anomaly Scan" to audit new statement entries.
-          </p>
-        </div>
-      ) : (
-        <div className="space-y-4">
-          {anomalies.map((anom) => (
+      <div className="space-y-3">
+        {anomalies.length === 0 ? (
+          <div className="rounded-2xl border border-slate-200 bg-white p-12 text-center text-xs text-slate-400 dark:border-slate-800 dark:bg-slate-900">
+            <ShieldCheck className="mx-auto h-8 w-8 text-emerald-500 mb-2" />
+            No anomalies detected matching current criteria. All accounts operating within standard historical parameters.
+          </div>
+        ) : (
+          anomalies.map((a) => (
             <div
-              key={anom._id}
-              className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm dark:border-slate-800 dark:bg-slate-900 transition-all hover:shadow-md"
+              key={a._id}
+              className="flex flex-col sm:flex-row sm:items-center justify-between rounded-2xl border border-slate-200 bg-white p-4 shadow-xs transition-all hover:border-slate-300 dark:border-slate-800 dark:bg-slate-900"
             >
-              <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4">
-                <div className="flex items-start gap-4">
-                  <div className="rounded-xl bg-red-50 p-3 text-red-600 dark:bg-red-950/50 dark:text-red-400 shrink-0">
-                    <AlertTriangle className="h-6 w-6" />
-                  </div>
-
-                  <div>
-                    <div className="flex items-center gap-2 flex-wrap">
-                      <span className={`rounded-md border px-2 py-0.5 text-[11px] font-bold uppercase tracking-wider ${getSeverityBadge(anom.severity)}`}>
-                        {anom.severity}
-                      </span>
-                      <span className="rounded-md bg-slate-100 px-2 py-0.5 text-[11px] font-semibold text-slate-600 dark:bg-slate-800 dark:text-slate-300">
-                        {anom.anomalyType}
-                      </span>
-                      <span className="text-xs text-slate-400">
-                        Flagged {new Date(anom.createdAt).toLocaleDateString()}
-                      </span>
-                    </div>
-
-                    <h3 className="text-base font-bold text-slate-900 dark:text-white mt-1.5">
-                      {anom.title}
-                    </h3>
-
-                    <p className="mt-1 text-xs text-slate-600 dark:text-slate-300 max-w-2xl">
-                      {anom.description}
-                    </p>
-
-                    {anom.affectedAmount > 0 && (
-                      <div className="mt-3 inline-flex items-center gap-2 rounded-lg bg-slate-50 px-3 py-1.5 text-xs dark:bg-slate-800/60">
-                        <span className="text-slate-400 font-medium">Impacted Ledger Amount:</span>
-                        <span className="font-bold text-slate-900 dark:text-white">
-                          ₹{anom.affectedAmount.toLocaleString('en-IN')}
-                        </span>
-                      </div>
-                    )}
-                  </div>
+              <div className="flex items-start gap-3">
+                <div
+                  className={`mt-1 flex h-8 w-8 shrink-0 items-center justify-center rounded-xl text-white ${
+                    a.severity === 'Critical'
+                      ? 'bg-rose-600'
+                      : a.severity === 'High'
+                      ? 'bg-amber-500'
+                      : 'bg-sky-500'
+                  }`}
+                >
+                  <AlertTriangle className="h-4 w-4" />
                 </div>
-
-                {/* Status & Actions */}
-                <div className="flex flex-col sm:items-end gap-3 shrink-0">
-                  <span
-                    className={`rounded-full px-3 py-1 text-xs font-bold text-center ${
-                      anom.status === 'Resolved'
-                        ? 'bg-emerald-50 text-emerald-700 dark:bg-emerald-950/60 dark:text-emerald-300'
-                        : anom.status === 'Dismissed'
-                        ? 'bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-400'
-                        : 'bg-amber-50 text-amber-700 dark:bg-amber-950/60 dark:text-amber-300'
-                    }`}
-                  >
-                    {anom.status}
-                  </span>
-
+                <div>
                   <div className="flex items-center gap-2">
-                    {anom.status !== 'Resolved' && (
-                      <button
-                        onClick={() => handleUpdateStatus(anom._id, 'Resolved')}
-                        className="rounded-xl bg-emerald-50 px-3 py-1.5 text-xs font-semibold text-emerald-700 hover:bg-emerald-100 dark:bg-emerald-950/50 dark:text-emerald-300"
-                      >
-                        Resolve
-                      </button>
-                    )}
-                    {anom.status !== 'Dismissed' && (
-                      <button
-                        onClick={() => handleUpdateStatus(anom._id, 'Dismissed')}
-                        className="rounded-xl border border-slate-200 px-3 py-1.5 text-xs font-semibold text-slate-600 hover:bg-slate-50 dark:border-slate-700 dark:text-slate-400"
-                      >
-                        Dismiss
-                      </button>
-                    )}
+                    <span className="font-bold text-sm text-slate-900 dark:text-white">{a.title}</span>
+                    <span
+                      className={`rounded px-1.5 py-0.5 text-[10px] font-semibold uppercase ${
+                        a.severity === 'Critical'
+                          ? 'bg-rose-100 text-rose-700 dark:bg-rose-950/60 dark:text-rose-300'
+                          : a.severity === 'High'
+                          ? 'bg-amber-100 text-amber-700 dark:bg-amber-950/60 dark:text-amber-300'
+                          : 'bg-sky-100 text-sky-700 dark:bg-sky-950/60 dark:text-sky-300'
+                      }`}
+                    >
+                      {a.severity}
+                    </span>
+                    <span
+                      className={`rounded px-1.5 py-0.5 text-[10px] font-medium ${
+                        a.status === 'Resolved'
+                          ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-950/60 dark:text-emerald-300'
+                          : a.status === 'Dismissed'
+                          ? 'bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-400'
+                          : 'bg-amber-50 text-amber-700 border border-amber-200 dark:bg-amber-950/40 dark:text-amber-300'
+                      }`}
+                    >
+                      {a.status}
+                    </span>
+                  </div>
+
+                  <p className="text-xs text-slate-500 dark:text-slate-400 mt-1 max-w-2xl">
+                    {a.description}
+                  </p>
+
+                  <div className="flex flex-wrap items-center gap-4 text-[11px] text-slate-400 mt-2 font-mono">
+                    <span>Amount: ₹{Number(a.affectedAmount || 0).toLocaleString()}</span>
+                    <span>Account: {a.bankAccountId?.bankName || 'General'}</span>
+                    <span>Confidence: {Math.round((a.confidenceScore || 0) * 100)}%</span>
+                    <span>Date: {new Date(a.createdAt).toLocaleDateString()}</span>
                   </div>
                 </div>
               </div>
+
+              <div className="mt-3 sm:mt-0 flex items-center gap-2">
+                <button
+                  onClick={() => {
+                    setSelectedAnomaly(a);
+                    setResolvingStatus(a.status === 'Detected' ? 'Resolved' : a.status);
+                    setResolutionNotes(a.resolutionNotes || '');
+                  }}
+                  className="rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 shadow-xs hover:bg-slate-50 dark:border-slate-800 dark:bg-slate-800 dark:text-slate-200 cursor-pointer"
+                >
+                  Review / Resolve
+                </button>
+              </div>
             </div>
-          ))}
+          ))
+        )}
+      </div>
+
+      {/* Resolution Modal */}
+      {selectedAnomaly && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 p-4 backdrop-blur-xs">
+          <div className="w-full max-w-md rounded-2xl border border-slate-200 bg-white p-6 shadow-2xl dark:border-slate-800 dark:bg-slate-900">
+            <div className="flex items-center justify-between border-b border-slate-100 pb-3 dark:border-slate-800">
+              <h3 className="font-bold text-slate-900 dark:text-white">Review & Resolve Anomaly</h3>
+              <button
+                onClick={() => setSelectedAnomaly(null)}
+                className="text-slate-400 hover:text-slate-700"
+              >
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+
+            <form onSubmit={handleUpdateStatus} className="space-y-4 mt-4 text-xs">
+              <div>
+                <span className="font-semibold text-slate-700 dark:text-slate-300">Issue Title:</span>
+                <p className="text-slate-900 dark:text-white font-medium mt-0.5">{selectedAnomaly.title}</p>
+                <p className="text-[11px] text-slate-500 mt-1">{selectedAnomaly.description}</p>
+              </div>
+
+              <div>
+                <label className="block font-semibold text-slate-700 dark:text-slate-300 mb-1">
+                  Investigation Status
+                </label>
+                <select
+                  value={resolvingStatus}
+                  onChange={(e) => setResolvingStatus(e.target.value)}
+                  className="w-full rounded-lg border border-slate-200 bg-slate-50/50 px-3 py-2 dark:border-slate-800 dark:bg-slate-800 dark:text-white"
+                >
+                  <option value="Detected">Detected (Open)</option>
+                  <option value="Investigating">Investigating</option>
+                  <option value="Resolved">Resolved (Audited & Approved)</option>
+                  <option value="Dismissed">Dismissed (False Positive)</option>
+                </select>
+              </div>
+
+              <div>
+                <label className="block font-semibold text-slate-700 dark:text-slate-300 mb-1">
+                  Resolution Notes / Audit Sign-off
+                </label>
+                <textarea
+                  rows={3}
+                  value={resolutionNotes}
+                  onChange={(e) => setResolutionNotes(e.target.value)}
+                  placeholder="e.g. Verified with engineering lead; annual subscription renewal invoice matched."
+                  className="w-full rounded-lg border border-slate-200 bg-slate-50/50 px-3 py-2 dark:border-slate-800 dark:bg-slate-800 dark:text-white"
+                />
+              </div>
+
+              <div className="flex justify-end gap-2 pt-2">
+                <button
+                  type="button"
+                  onClick={() => setSelectedAnomaly(null)}
+                  className="rounded-lg px-3 py-2 text-slate-600 hover:bg-slate-100 dark:text-slate-300"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  className="rounded-lg bg-brand-600 px-4 py-2 font-semibold text-white hover:bg-brand-500 cursor-pointer"
+                >
+                  Save Status
+                </button>
+              </div>
+            </form>
+          </div>
         </div>
       )}
     </div>

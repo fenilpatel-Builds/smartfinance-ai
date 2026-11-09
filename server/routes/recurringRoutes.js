@@ -20,3 +20,4 @@ router.put('/:id', requireWorkspacePermission('editor'), updateRecurringTransact
 router.delete('/:id', requireWorkspacePermission('editor'), deleteRecurringTransaction);
 
 export default router;
+

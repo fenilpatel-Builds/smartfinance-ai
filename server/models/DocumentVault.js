@@ -62,3 +62,4 @@ documentVaultSchema.index({ workspaceId: 1, category: 1 });
 documentVaultSchema.index({ workspaceId: 1, tags: 1 });
 
 export default mongoose.model('DocumentVault', documentVaultSchema);
+

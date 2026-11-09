@@ -20,3 +20,4 @@ router.post('/:id/contribute', requireWorkspacePermission('editor'), contributeT
 router.delete('/:id', requireWorkspacePermission('admin'), deleteGoal);
 
 export default router;
+

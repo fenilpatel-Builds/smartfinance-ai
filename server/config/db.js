@@ -11,7 +11,7 @@ const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 export const connectDB = async () => {
   const isProduction = process.env.NODE_ENV === 'production';
   const isTest = process.env.NODE_ENV === 'test';
-  const uri = process.env.MONGODB_URI || 'mongodb://127.0.0.1:27017/smartfinance';
+  const uri = process.env.MONGODB_URI || process.env.MONGO_URI || 'mongodb://127.0.0.1:27017/smartfinance';
 
   let attempt = 0;
 

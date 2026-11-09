@@ -41,3 +41,4 @@ router.get('/:id/download', requireWorkspacePermission('viewer'), downloadDocume
 router.delete('/:id', requireWorkspacePermission('editor'), deleteDocument);
 
 export default router;
+

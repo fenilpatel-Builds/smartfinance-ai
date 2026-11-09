@@ -2,324 +2,249 @@ import React, { useState, useEffect } from 'react';
 import {
   TrendingUp,
   Calendar,
-  DollarSign,
-  ArrowRightLeft,
+  AlertCircle,
   ShieldCheck,
-  AlertTriangle,
-  Sparkles,
-  ArrowUpRight,
-  ArrowDownRight,
-  Coins,
+  ArrowRight,
+  RefreshCw,
+  Info,
+  DollarSign,
+  TrendingDown,
+  Layers,
 } from 'lucide-react';
 import {
-  ResponsiveContainer,
-  LineChart,
-  Line,
+  AreaChart,
+  Area,
   XAxis,
   YAxis,
   CartesianGrid,
   Tooltip,
+  ResponsiveContainer,
   Legend,
 } from 'recharts';
 import api from '../../services/api';
 
 export const ForecastPage = () => {
-  const [days, setDays] = useState(60);
-  const [forecast, setForecast] = useState(null);
+  const [days, setDays] = useState(90);
+  const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
 
-  // Currency Converter State
-  const [convertAmount, setConvertAmount] = useState('1000');
-  const [fromCurr, setFromCurr] = useState('USD');
-  const [toCurr, setToCurr] = useState('INR');
-  const [conversionResult, setConversionResult] = useState(null);
-  const [converting, setConverting] = useState(false);
-
-  const fetchForecast = async (forecastDays) => {
+  const fetchForecast = async () => {
     try {
       setLoading(true);
-      const res = await api.get(`/intelligence/forecast?days=${forecastDays}`);
-      setForecast(res.data.forecast || null);
+      const res = await api.get(`/intelligence/forecast?days=${days}`);
+      setData(res.data.forecast);
     } catch (err) {
-      console.error('Failed to load forecast:', err);
+      console.error('Failed to load forecast data:', err);
     } finally {
       setLoading(false);
     }
   };
 
-  const handleConvert = async (e) => {
-    if (e) e.preventDefault();
-    try {
-      setConverting(true);
-      const res = await api.post('/intelligence/currency/convert', {
-        amount: parseFloat(convertAmount),
-        from: fromCurr,
-        to: toCurr,
-      });
-      setConversionResult(res.data);
-    } catch (err) {
-      console.error('Failed currency conversion:', err);
-    } finally {
-      setConverting(false);
-    }
-  };
-
   useEffect(() => {
-    fetchForecast(days);
-    handleConvert();
+    fetchForecast();
   }, [days]);
+
+  const {
+    startingBalance = 0,
+    totalProjectedInflow = 0,
+    totalProjectedOutflow = 0,
+    netProjectedDelta = 0,
+    endProjectedBalance = 0,
+    timeline = [],
+    scheduledInflowsCount = 0,
+    scheduledOutflowsCount = 0,
+  } = data || {};
 
   return (
     <div className="space-y-6">
       {/* Header */}
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <div className="flex items-center gap-2">
-            <h1 className="text-2xl font-bold tracking-tight text-slate-900 dark:text-white">
-              Cash Flow Forecasting & Liquidity Intelligence
-            </h1>
-            <span className="inline-flex items-center rounded-full bg-brand-50 px-2.5 py-0.5 text-xs font-medium text-brand-700 dark:bg-brand-950/60 dark:text-brand-300">
-              Predictive Runways
-            </span>
-          </div>
-          <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
-            Simulate 30, 60, and 90-day cash trajectories across Conservative, Expected, and Best-Case operating scenarios.
+          <h1 className="text-xl font-bold tracking-tight text-slate-900 dark:text-white sm:text-2xl">
+            Cash Flow Forecasting & Liquidity Projection
+          </h1>
+          <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
+            Deterministic liquidity forecasts based on confirmed recurring commitments, invoice receivables, and historical baseline
           </p>
         </div>
 
-        {/* Days selector */}
-        <div className="flex items-center rounded-xl bg-slate-100 p-1 dark:bg-slate-800">
+        {/* Forecast Horizon Tabs */}
+        <div className="flex items-center gap-2">
           {[30, 60, 90].map((d) => (
             <button
               key={d}
               onClick={() => setDays(d)}
               className={`rounded-lg px-3 py-1.5 text-xs font-semibold transition-all ${
                 days === d
-                  ? 'bg-white text-slate-900 shadow-sm dark:bg-slate-700 dark:text-white'
-                  : 'text-slate-600 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white'
+                  ? 'bg-brand-600 text-white shadow-sm'
+                  : 'border border-slate-200 bg-white text-slate-600 hover:bg-slate-50 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-300'
               }`}
             >
-              {d} Days Outlook
+              {d} Days
             </button>
           ))}
-        </div>
-      </div>
-
-      {/* KPI Summary Cards */}
-      {forecast && (
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-5">
-          <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-800 dark:bg-slate-900">
-            <span className="text-xs font-medium uppercase tracking-wider text-slate-500">Starting Liquidity</span>
-            <div className="mt-2 text-xl font-bold text-slate-900 dark:text-white">
-              ₹{(forecast.startingBalance || 0).toLocaleString('en-IN')}
-            </div>
-            <div className="mt-1 text-xs text-slate-400">Across active bank accounts</div>
-          </div>
-
-          <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-800 dark:bg-slate-900">
-            <span className="text-xs font-medium uppercase tracking-wider text-slate-500">Projected Inflows</span>
-            <div className="mt-2 text-xl font-bold text-emerald-600 dark:text-emerald-400 flex items-center gap-1">
-              <ArrowUpRight className="h-4 w-4" />
-              ₹{(forecast.totalProjectedInflow || 0).toLocaleString('en-IN')}
-            </div>
-            <div className="mt-1 text-xs text-slate-400">{forecast.scheduledInflowsCount || 0} scheduled invoices</div>
-          </div>
-
-          <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-800 dark:bg-slate-900">
-            <span className="text-xs font-medium uppercase tracking-wider text-slate-500">Projected Outflows</span>
-            <div className="mt-2 text-xl font-bold text-red-600 dark:text-red-400 flex items-center gap-1">
-              <ArrowDownRight className="h-4 w-4" />
-              ₹{(forecast.totalProjectedOutflow || 0).toLocaleString('en-IN')}
-            </div>
-            <div className="mt-1 text-xs text-slate-400">{forecast.scheduledOutflowsCount || 0} bills & loan EMIs</div>
-          </div>
-
-          <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-800 dark:bg-slate-900">
-            <span className="text-xs font-medium uppercase tracking-wider text-slate-500">Net Delta</span>
-            <div
-              className={`mt-2 text-xl font-bold ${
-                forecast.netProjectedDelta >= 0 ? 'text-emerald-600 dark:text-emerald-400' : 'text-amber-600 dark:text-amber-400'
-              }`}
-            >
-              {forecast.netProjectedDelta >= 0 ? '+' : ''}₹{(forecast.netProjectedDelta || 0).toLocaleString('en-IN')}
-            </div>
-            <div className="mt-1 text-xs text-slate-400">Net operating delta</div>
-          </div>
-
-          <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-800 dark:bg-slate-900">
-            <span className="text-xs font-medium uppercase tracking-wider text-slate-500">Projected Day {days} Cash</span>
-            <div className="mt-2 text-xl font-bold text-brand-600 dark:text-brand-400">
-              ₹{(forecast.endProjectedBalance || 0).toLocaleString('en-IN')}
-            </div>
-            <div className="mt-1 text-xs text-slate-400">Expected balance closing</div>
-          </div>
-        </div>
-      )}
-
-      {/* Main Multi-Scenario Chart */}
-      <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm dark:border-slate-800 dark:bg-slate-900">
-        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between pb-6 gap-2 border-b border-slate-100 dark:border-slate-800">
-          <div>
-            <h2 className="text-base font-bold text-slate-900 dark:text-white">
-              {days}-Day Cash Trajectory Scenarios
-            </h2>
-            <p className="text-xs text-slate-500">
-              Deterministic modeling based on confirmed recurring contracts, scheduled EMIs, and invoice due dates.
-            </p>
-          </div>
-
-          <div className="flex items-center gap-4 text-xs font-medium">
-            <div className="flex items-center gap-1.5">
-              <span className="h-3 w-3 rounded-full bg-brand-600 inline-block"></span>
-              <span className="text-slate-700 dark:text-slate-300">Expected</span>
-            </div>
-            <div className="flex items-center gap-1.5">
-              <span className="h-3 w-3 rounded-full bg-amber-500 inline-block"></span>
-              <span className="text-slate-700 dark:text-slate-300">Conservative (70% Inflow / +10% Outflow)</span>
-            </div>
-            <div className="flex items-center gap-1.5">
-              <span className="h-3 w-3 rounded-full bg-emerald-500 inline-block"></span>
-              <span className="text-slate-700 dark:text-slate-300">Best-Case (100% Inflow / -5% Outflow)</span>
-            </div>
-          </div>
-        </div>
-
-        {loading ? (
-          <div className="flex h-80 items-center justify-center">
-            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-brand-600"></div>
-          </div>
-        ) : forecast?.timeline?.length > 0 ? (
-          <div className="mt-6 h-80 w-full">
-            <ResponsiveContainer width="100%" height="100%">
-              <LineChart data={forecast.timeline} margin={{ top: 10, right: 30, left: 20, bottom: 0 }}>
-                <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" opacity={0.6} />
-                <XAxis dataKey="date" stroke="#94a3b8" fontSize={11} tickLine={false} />
-                <YAxis
-                  stroke="#94a3b8"
-                  fontSize={11}
-                  tickLine={false}
-                  tickFormatter={(val) => `₹${(val / 1000).toFixed(0)}k`}
-                />
-                <Tooltip
-                  formatter={(val) => [`₹${val.toLocaleString('en-IN')}`, '']}
-                  contentStyle={{
-                    backgroundColor: '#1e293b',
-                    borderRadius: '0.75rem',
-                    border: 'none',
-                    color: '#fff',
-                    fontSize: '12px',
-                  }}
-                />
-                <Line
-                  type="monotone"
-                  dataKey="bestCaseBalance"
-                  name="Best-Case"
-                  stroke="#10b981"
-                  strokeWidth={2}
-                  dot={false}
-                />
-                <Line
-                  type="monotone"
-                  dataKey="expectedBalance"
-                  name="Expected"
-                  stroke="#3b82f6"
-                  strokeWidth={2.5}
-                  dot={{ r: 3 }}
-                />
-                <Line
-                  type="monotone"
-                  dataKey="conservativeBalance"
-                  name="Conservative"
-                  stroke="#f59e0b"
-                  strokeDasharray="4 4"
-                  strokeWidth={2}
-                  dot={false}
-                />
-              </LineChart>
-            </ResponsiveContainer>
-          </div>
-        ) : (
-          <div className="p-12 text-center text-sm text-slate-500">No trajectory timeline data available.</div>
-        )}
-      </div>
-
-      {/* Multi-Currency Conversion Utility */}
-      <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm dark:border-slate-800 dark:bg-slate-900">
-        <div className="flex items-center gap-2 mb-4">
-          <div className="rounded-lg bg-emerald-50 p-2 text-emerald-600 dark:bg-emerald-950/50 dark:text-emerald-400">
-            <Coins className="h-5 w-5" />
-          </div>
-          <div>
-            <h2 className="text-base font-bold text-slate-900 dark:text-white">
-              Multi-Currency FX Conversion Engine
-            </h2>
-            <p className="text-xs text-slate-500">
-              Real-time multi-currency valuation for foreign client receivables and vendor disbursements.
-            </p>
-          </div>
-        </div>
-
-        <form onSubmit={handleConvert} className="grid grid-cols-1 sm:grid-cols-4 gap-4 items-end">
-          <div>
-            <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300">Amount</label>
-            <input
-              type="number"
-              min="0"
-              step="0.01"
-              value={convertAmount}
-              onChange={(e) => setConvertAmount(e.target.value)}
-              className="mt-1 block w-full rounded-xl border border-slate-200 px-3 py-2 text-sm text-slate-900 focus:border-brand-500 focus:outline-none dark:border-slate-700 dark:bg-slate-800 dark:text-white"
-            />
-          </div>
-
-          <div>
-            <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300">From Currency</label>
-            <select
-              value={fromCurr}
-              onChange={(e) => setFromCurr(e.target.value)}
-              className="mt-1 block w-full rounded-xl border border-slate-200 px-3 py-2 text-sm text-slate-900 focus:border-brand-500 focus:outline-none dark:border-slate-700 dark:bg-slate-800 dark:text-white"
-            >
-              {['USD', 'EUR', 'GBP', 'AED', 'SGD', 'JPY', 'CAD', 'INR'].map((c) => (
-                <option key={c} value={c}>{c}</option>
-              ))}
-            </select>
-          </div>
-
-          <div>
-            <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300">To Currency</label>
-            <select
-              value={toCurr}
-              onChange={(e) => setToCurr(e.target.value)}
-              className="mt-1 block w-full rounded-xl border border-slate-200 px-3 py-2 text-sm text-slate-900 focus:border-brand-500 focus:outline-none dark:border-slate-700 dark:bg-slate-800 dark:text-white"
-            >
-              {['INR', 'USD', 'EUR', 'GBP', 'AED', 'SGD', 'JPY', 'CAD'].map((c) => (
-                <option key={c} value={c}>{c}</option>
-              ))}
-            </select>
-          </div>
-
           <button
-            type="submit"
-            disabled={converting}
-            className="rounded-xl bg-brand-600 px-4 py-2 text-sm font-semibold text-white shadow-sm hover:bg-brand-500 transition-all"
+            onClick={fetchForecast}
+            className="rounded-lg border border-slate-200 bg-white p-1.5 text-slate-500 hover:text-slate-900 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-400"
+            title="Refresh"
           >
-            {converting ? 'Calculating...' : 'Convert FX'}
+            <RefreshCw className="h-4 w-4" />
           </button>
-        </form>
+        </div>
+      </div>
 
-        {conversionResult && (
-          <div className="mt-4 rounded-xl bg-slate-50 p-4 dark:bg-slate-800/50 flex flex-col sm:flex-row items-center justify-between text-sm">
-            <div>
-              <span className="text-slate-500 text-xs">Converted Valuation</span>
-              <div className="text-xl font-bold text-slate-900 dark:text-white mt-0.5">
-                {conversionResult.toCurrency} {conversionResult.convertedAmount.toLocaleString()}
-              </div>
-            </div>
-            <div className="text-xs text-slate-400 mt-2 sm:mt-0">
-              1 {conversionResult.fromCurrency} = {conversionResult.rate} {conversionResult.toCurrency}
-            </div>
+      {/* Distinction Alert Banner */}
+      <div className="flex items-start gap-3 rounded-xl border border-sky-200 bg-sky-50/60 p-4 text-xs text-sky-900 dark:border-sky-900/60 dark:bg-sky-950/30 dark:text-sky-300">
+        <Info className="h-4 w-4 shrink-0 text-sky-600 dark:text-sky-400 mt-0.5" />
+        <div>
+          <span className="font-semibold">Deterministic Forecast Principle:</span> Forecast values model expected cash trajectories using confirmed recurring payments and pending receivables. They are clearly distinguished from audited real-time bank ledger balances.
+        </div>
+      </div>
+
+      {/* KPI Cards */}
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+        <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-xs dark:border-slate-800 dark:bg-slate-900">
+          <span className="text-xs font-medium text-slate-500 dark:text-slate-400">Current Liquid Cash</span>
+          <h2 className="text-2xl font-bold tracking-tight text-slate-900 dark:text-white mt-1">
+            ₹{startingBalance.toLocaleString()}
+          </h2>
+          <p className="text-[11px] text-slate-400 mt-1">Starting baseline across accounts</p>
+        </div>
+
+        <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-xs dark:border-slate-800 dark:bg-slate-900">
+          <span className="text-xs font-medium text-slate-500 dark:text-slate-400">Scheduled Inflows ({days}d)</span>
+          <h2 className="text-2xl font-bold tracking-tight text-emerald-600 mt-1">
+            +₹{totalProjectedInflow.toLocaleString()}
+          </h2>
+          <p className="text-[11px] text-slate-400 mt-1">From {scheduledInflowsCount} receivable invoices</p>
+        </div>
+
+        <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-xs dark:border-slate-800 dark:bg-slate-900">
+          <span className="text-xs font-medium text-slate-500 dark:text-slate-400">Scheduled Outflows ({days}d)</span>
+          <h2 className="text-2xl font-bold tracking-tight text-rose-600 mt-1">
+            -₹{totalProjectedOutflow.toLocaleString()}
+          </h2>
+          <p className="text-[11px] text-slate-400 mt-1">From {scheduledOutflowsCount} commitments & EMIs</p>
+        </div>
+
+        <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-xs dark:border-slate-800 dark:bg-slate-900">
+          <span className="text-xs font-medium text-slate-500 dark:text-slate-400">Projected Ending Balance</span>
+          <h2 className="text-2xl font-bold tracking-tight text-indigo-600 dark:text-indigo-400 mt-1">
+            ₹{endProjectedBalance.toLocaleString()}
+          </h2>
+          <p className="text-[11px] text-slate-400 mt-1">
+            Net delta: {netProjectedDelta >= 0 ? '+' : ''}₹{netProjectedDelta.toLocaleString()}
+          </p>
+        </div>
+      </div>
+
+      {/* Main Forecast Trajectory Chart */}
+      <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-xs dark:border-slate-800 dark:bg-slate-900">
+        <div className="flex items-center justify-between mb-4 border-b border-slate-100 pb-3 dark:border-slate-800">
+          <div>
+            <h3 className="text-sm font-bold text-slate-900 dark:text-white">
+              Projected Liquidity Trajectory ({days} Days)
+            </h3>
+            <p className="text-[11px] text-slate-400">
+              Comparing Expected Baseline against Conservative (70% collection, +10% expenses) and Best-Case scenarios
+            </p>
           </div>
-        )}
+          <div className="flex items-center gap-4 text-xs">
+            <span className="flex items-center gap-1.5 font-medium text-brand-600">
+              <span className="h-2 w-2 rounded-full bg-brand-600" /> Expected
+            </span>
+            <span className="flex items-center gap-1.5 font-medium text-amber-500">
+              <span className="h-2 w-2 rounded-full bg-amber-500" /> Conservative
+            </span>
+            <span className="flex items-center gap-1.5 font-medium text-emerald-500">
+              <span className="h-2 w-2 rounded-full bg-emerald-500" /> Best-Case
+            </span>
+          </div>
+        </div>
+
+        <div className="h-72 w-full">
+          <ResponsiveContainer width="100%" height="100%">
+            <AreaChart data={timeline} margin={{ top: 10, right: 10, left: 10, bottom: 0 }}>
+              <defs>
+                <linearGradient id="colorExpected" x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="5%" stopColor="#6366f1" stopOpacity={0.3} />
+                  <stop offset="95%" stopColor="#6366f1" stopOpacity={0} />
+                </linearGradient>
+                <linearGradient id="colorConservative" x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="5%" stopColor="#f59e0b" stopOpacity={0.2} />
+                  <stop offset="95%" stopColor="#f59e0b" stopOpacity={0} />
+                </linearGradient>
+              </defs>
+              <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e2e8f0" />
+              <XAxis dataKey="date" tick={{ fontSize: 11 }} tickLine={false} axisLine={false} />
+              <YAxis
+                tick={{ fontSize: 11 }}
+                tickLine={false}
+                axisLine={false}
+                tickFormatter={(v) => `₹${(v / 1000).toFixed(0)}k`}
+              />
+              <Tooltip
+                formatter={(val) => [`₹${Number(val).toLocaleString()}`, '']}
+                contentStyle={{ borderRadius: '12px', border: '1px solid #e2e8f0', fontSize: '12px' }}
+              />
+              <Area
+                type="monotone"
+                dataKey="bestCaseBalance"
+                stroke="#10b981"
+                strokeWidth={1.5}
+                strokeDasharray="4 4"
+                fill="none"
+                name="Best-Case"
+              />
+              <Area
+                type="monotone"
+                dataKey="expectedBalance"
+                stroke="#6366f1"
+                strokeWidth={2.5}
+                fillOpacity={1}
+                fill="url(#colorExpected)"
+                name="Expected"
+              />
+              <Area
+                type="monotone"
+                dataKey="conservativeBalance"
+                stroke="#f59e0b"
+                strokeWidth={2}
+                fillOpacity={1}
+                fill="url(#colorConservative)"
+                name="Conservative"
+              />
+            </AreaChart>
+          </ResponsiveContainer>
+        </div>
+      </div>
+
+      {/* Assumptions & Methodology Card */}
+      <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-xs dark:border-slate-800 dark:bg-slate-900">
+        <h3 className="text-sm font-bold text-slate-900 dark:text-white mb-2 flex items-center gap-2">
+          <Layers className="h-4 w-4 text-brand-600" />
+          Model Assumptions & Scenario Parameters
+        </h3>
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-xs mt-3">
+          <div className="rounded-xl border border-slate-100 bg-slate-50/60 p-3.5 dark:border-slate-800 dark:bg-slate-800/40">
+            <span className="font-semibold text-slate-800 dark:text-slate-200">Expected Baseline</span>
+            <p className="text-slate-500 mt-1">
+              Assumes 100% timely receipt of due customer invoices and exact fulfillment of active recurring contracts and scheduled loan EMIs.
+            </p>
+          </div>
+          <div className="rounded-xl border border-slate-100 bg-slate-50/60 p-3.5 dark:border-slate-800 dark:bg-slate-800/40">
+            <span className="font-semibold text-amber-600 dark:text-amber-400">Conservative Stress Test</span>
+            <p className="text-slate-500 mt-1">
+              Applies a 30% haircut on invoice collections (assuming deferred client payments) and adds a 10% inflation buffer to all overhead and operational outflows.
+            </p>
+          </div>
+          <div className="rounded-xl border border-slate-100 bg-slate-50/60 p-3.5 dark:border-slate-800 dark:bg-slate-800/40">
+            <span className="font-semibold text-emerald-600 dark:text-emerald-400">Best-Case Trajectory</span>
+            <p className="text-slate-500 mt-1">
+              Assumes accelerated invoice settlements (+5% bonus collections) combined with active 5% cost trimming across non-essential recurring vendor licenses.
+            </p>
+          </div>
+        </div>
       </div>
     </div>
   );

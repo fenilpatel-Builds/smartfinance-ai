@@ -365,9 +365,8 @@ export const TransactionsPage = () => {
               {transactions.map((t) => (
                 <tr
                   key={t._id}
-                  className={`hover:bg-slate-50/60 dark:hover:bg-slate-800/30 ${
-                    selectedTxIds.includes(t._id) ? 'bg-brand-50/20 dark:bg-brand-950/20' : ''
-                  }`}
+                  className={`hover:bg-slate-50/60 dark:hover:bg-slate-800/30 ${selectedTxIds.includes(t._id) ? 'bg-brand-50/20 dark:bg-brand-950/20' : ''
+                    }`}
                 >
                   <td className="p-3">
                     <button onClick={() => toggleSelectTx(t._id)} className="cursor-pointer">

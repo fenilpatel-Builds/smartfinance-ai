@@ -16,3 +16,4 @@ router.post('/scan', requireWorkspacePermission('editor'), scanAnomalies);
 router.put('/:id', requireWorkspacePermission('editor'), updateAnomalyStatus);
 
 export default router;
+

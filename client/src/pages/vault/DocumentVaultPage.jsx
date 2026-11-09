@@ -3,17 +3,27 @@ import {
   FolderLock,
   UploadCloud,
   FileText,
-  FileCheck,
+  Search,
+  Filter,
   Download,
   Trash2,
+  Calendar,
   Tag,
-  Search,
+  ShieldCheck,
   X,
-  File,
-  Shield,
-  Clock,
+  FileCheck,
 } from 'lucide-react';
 import api from '../../services/api';
+
+const CATEGORIES = [
+  'All',
+  'Bank Statement',
+  'Receipt',
+  'Invoice',
+  'Tax Document',
+  'Legal & Agreement',
+  'Other',
+];
 
 export const DocumentVaultPage = () => {
   const [documents, setDocuments] = useState([]);
@@ -22,15 +32,13 @@ export const DocumentVaultPage = () => {
   const [categoryFilter, setCategoryFilter] = useState('All');
   const [search, setSearch] = useState('');
   const [showUploadModal, setShowUploadModal] = useState(false);
-  const [uploadFile, setUploadFile] = useState(null);
-  const [uploading, setUploading] = useState(false);
 
-  const [formData, setFormData] = useState({
-    title: '',
-    category: 'Bank Statement',
-    tags: '',
-    notes: '',
-  });
+  const [file, setFile] = useState(null);
+  const [docTitle, setDocTitle] = useState('');
+  const [docCategory, setDocCategory] = useState('Bank Statement');
+  const [docTags, setDocTags] = useState('');
+  const [docNotes, setDocNotes] = useState('');
+  const [uploading, setUploading] = useState(false);
 
   const fetchDocuments = async () => {
     try {
@@ -38,11 +46,12 @@ export const DocumentVaultPage = () => {
       const params = {};
       if (categoryFilter !== 'All') params.category = categoryFilter;
       if (search) params.search = search;
+
       const res = await api.get('/documents', { params });
       setDocuments(res.data.documents || []);
       setMetrics(res.data.metrics || {});
     } catch (err) {
-      console.error('Failed to load vault documents:', err);
+      console.error('Failed to load documents:', err);
     } finally {
       setLoading(false);
     }
@@ -50,56 +59,58 @@ export const DocumentVaultPage = () => {
 
   useEffect(() => {
     fetchDocuments();
-  }, [categoryFilter]);
+  }, [categoryFilter, search]);
 
   const handleUpload = async (e) => {
     e.preventDefault();
-    if (!uploadFile) {
-      alert('Please select a file to upload');
+    if (!file) {
+      alert('Please select a document file to upload');
       return;
     }
 
+    const formData = new FormData();
+    formData.append('document', file);
+    formData.append('title', docTitle || file.name);
+    formData.append('category', docCategory);
+    formData.append('tags', docTags);
+    formData.append('notes', docNotes);
+
     try {
       setUploading(true);
-      const data = new FormData();
-      data.append('file', uploadFile);
-      data.append('title', formData.title || uploadFile.name);
-      data.append('category', formData.category);
-      data.append('tags', formData.tags);
-      data.append('notes', formData.notes);
-
-      await api.post('/documents/upload', data, {
+      await api.post('/documents/upload', formData, {
         headers: { 'Content-Type': 'multipart/form-data' },
       });
-
       setShowUploadModal(false);
-      setUploadFile(null);
-      setFormData({ title: '', category: 'Bank Statement', tags: '', notes: '' });
+      setFile(null);
+      setDocTitle('');
+      setDocTags('');
+      setDocNotes('');
       fetchDocuments();
     } catch (err) {
-      alert(err.response?.data?.message || 'Failed to upload document to vault');
+      alert(err.response?.data?.message || 'Upload failed');
     } finally {
       setUploading(false);
     }
   };
 
   const handleDelete = async (id) => {
-    if (!window.confirm('Delete this encrypted document from the vault?')) return;
-    try {
-      await api.delete(`/documents/${id}`);
-      fetchDocuments();
-    } catch (err) {
-      alert(err.response?.data?.message || 'Failed to delete');
+    if (window.confirm('Delete this document from vault?')) {
+      try {
+        await api.delete(`/documents/${id}`);
+        fetchDocuments();
+      } catch (err) {
+        alert(err.response?.data?.message || 'Delete failed');
+      }
     }
   };
 
-  const handleDownload = async (doc) => {
+  const handleDownload = async (docId, fileName) => {
     try {
-      const res = await api.get(`/documents/${doc._id}/download`, { responseType: 'blob' });
+      const res = await api.get(`/documents/${docId}/download`, { responseType: 'blob' });
       const url = window.URL.createObjectURL(new Blob([res.data]));
       const link = document.createElement('a');
       link.href = url;
-      link.setAttribute('download', doc.originalFileName || 'document.pdf');
+      link.setAttribute('download', fileName);
       document.body.appendChild(link);
       link.click();
       link.remove();
@@ -108,286 +119,257 @@ export const DocumentVaultPage = () => {
     }
   };
 
-  const categories = ['All', 'Bank Statement', 'Invoice', 'Receipt', 'Tax Document', 'Legal Contract', 'Other'];
-
   return (
     <div className="space-y-6">
       {/* Header */}
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <div className="flex items-center gap-2">
-            <h1 className="text-2xl font-bold tracking-tight text-slate-900 dark:text-white">
-              Secure Financial Document Vault
-            </h1>
-            <span className="inline-flex items-center rounded-full bg-slate-100 px-2.5 py-0.5 text-xs font-medium text-slate-700 dark:bg-slate-800 dark:text-slate-300">
-              SHA-256 Verified
-            </span>
-          </div>
-          <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
-            Encrypted repository for tax returns, audit schedules, vendor receipts, and executed contracts.
+          <h1 className="text-xl font-bold tracking-tight text-slate-900 dark:text-white sm:text-2xl">
+            Financial Document Vault & Compliance Archive
+          </h1>
+          <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
+            Encrypted central repository for bank statements, tax returns, vendor contracts, receipts, and audit attachments
           </p>
         </div>
 
         <button
           onClick={() => setShowUploadModal(true)}
-          className="inline-flex items-center gap-2 rounded-xl bg-brand-600 px-4 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-brand-500 transition-all"
+          className="flex items-center gap-2 rounded-lg bg-brand-600 px-3.5 py-2 text-xs font-semibold text-white shadow-sm hover:bg-brand-500 cursor-pointer"
         >
-          <UploadCloud className="h-4 w-4" />
-          <span>Deposit Document</span>
+          <UploadCloud className="h-4 w-4" /> Upload Document
         </button>
       </div>
 
       {/* KPI Cards */}
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
-        <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-800 dark:bg-slate-900">
-          <div className="flex items-center justify-between">
-            <span className="text-xs font-medium uppercase tracking-wider text-slate-500">Vault Documents</span>
-            <div className="rounded-lg bg-blue-50 p-2 text-blue-600 dark:bg-blue-950/50 dark:text-blue-400">
-              <FolderLock className="h-4 w-4" />
-            </div>
-          </div>
-          <div className="mt-2 text-2xl font-bold text-slate-900 dark:text-white">
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+        <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-xs dark:border-slate-800 dark:bg-slate-900">
+          <span className="text-xs font-medium text-slate-500 dark:text-slate-400">Total Vault Documents</span>
+          <h2 className="text-2xl font-bold tracking-tight text-slate-900 dark:text-white mt-1">
             {metrics.totalDocuments || 0}
-          </div>
-          <div className="mt-1 text-xs text-slate-500">Indexed & cryptographically hashed files</div>
+          </h2>
+          <p className="text-[11px] text-slate-400 mt-1">Safely archived in encrypted storage</p>
         </div>
 
-        <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-800 dark:bg-slate-900">
-          <div className="flex items-center justify-between">
-            <span className="text-xs font-medium uppercase tracking-wider text-slate-500">Encrypted Storage</span>
-            <div className="rounded-lg bg-emerald-50 p-2 text-emerald-600 dark:bg-emerald-950/50 dark:text-emerald-400">
-              <Shield className="h-4 w-4" />
-            </div>
-          </div>
-          <div className="mt-2 text-2xl font-bold text-emerald-600 dark:text-emerald-400">
+        <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-xs dark:border-slate-800 dark:bg-slate-900">
+          <span className="text-xs font-medium text-slate-500 dark:text-slate-400">Total Storage Utilization</span>
+          <h2 className="text-2xl font-bold tracking-tight text-brand-600 mt-1">
             {metrics.totalStorageMB || 0} MB
-          </div>
-          <div className="mt-1 text-xs text-slate-500">Total physical disk usage</div>
+          </h2>
+          <p className="text-[11px] text-slate-400 mt-1">Across all workspaces files</p>
         </div>
 
-        <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-800 dark:bg-slate-900">
-          <div className="flex items-center justify-between">
-            <span className="text-xs font-medium uppercase tracking-wider text-slate-500">Compliance Integrity</span>
-            <div className="rounded-lg bg-indigo-50 p-2 text-indigo-600 dark:bg-indigo-950/50 dark:text-indigo-400">
-              <FileCheck className="h-4 w-4" />
-            </div>
-          </div>
-          <div className="mt-2 text-2xl font-bold text-indigo-600 dark:text-indigo-400">
-            100% Verified
-          </div>
-          <div className="mt-1 text-xs text-slate-500">7-year audit retention ready</div>
+        <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-xs dark:border-slate-800 dark:bg-slate-900">
+          <span className="text-xs font-medium text-slate-500 dark:text-slate-400">Integrity Check</span>
+          <h2 className="text-2xl font-bold tracking-tight text-emerald-600 mt-1 flex items-center gap-1.5">
+            <ShieldCheck className="h-6 w-6" /> Verified
+          </h2>
+          <p className="text-[11px] text-slate-400 mt-1">SHA-256 tamper-evident checksums active</p>
         </div>
       </div>
 
-      {/* Filter Tabs & Search */}
-      <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
-        <div className="flex flex-wrap items-center gap-1.5 rounded-xl bg-slate-100 p-1 dark:bg-slate-800">
-          {categories.map((c) => (
+      {/* Categories & Search Bar */}
+      <div className="flex flex-col sm:flex-row items-center justify-between gap-3">
+        <div className="flex items-center gap-1.5 overflow-x-auto w-full sm:w-auto">
+          {CATEGORIES.map((cat) => (
             <button
-              key={c}
-              onClick={() => setCategoryFilter(c)}
-              className={`rounded-lg px-3 py-1.5 text-xs font-semibold transition-all ${
-                categoryFilter === c
-                  ? 'bg-white text-slate-900 shadow-sm dark:bg-slate-700 dark:text-white'
-                  : 'text-slate-600 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white'
+              key={cat}
+              onClick={() => setCategoryFilter(cat)}
+              className={`rounded-lg px-3 py-1.5 text-xs font-medium transition-colors ${
+                categoryFilter === cat
+                  ? 'bg-brand-600 text-white font-semibold'
+                  : 'bg-slate-100 text-slate-600 hover:bg-slate-200 dark:bg-slate-800 dark:text-slate-300'
               }`}
             >
-              {c}
+              {cat}
             </button>
           ))}
         </div>
 
         <div className="relative w-full sm:w-64">
-          <Search className="absolute left-3 top-2.5 h-4 w-4 text-slate-400" />
+          <Search className="absolute left-3 top-2.5 h-3.5 w-3.5 text-slate-400" />
           <input
             type="text"
-            placeholder="Search vault documents..."
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            onKeyDown={(e) => e.key === 'Enter' && fetchDocuments()}
-            className="w-full rounded-xl border border-slate-200 pl-9 pr-4 py-2 text-xs text-slate-900 focus:border-brand-500 focus:outline-none dark:border-slate-700 dark:bg-slate-800 dark:text-white"
+            placeholder="Search title, tag, filename..."
+            className="w-full rounded-lg border border-slate-200 bg-white pl-8 pr-3 py-1.5 text-xs dark:border-slate-800 dark:bg-slate-900 dark:text-white"
           />
         </div>
       </div>
 
       {/* Documents Grid */}
-      {loading ? (
-        <div className="flex h-48 items-center justify-center rounded-2xl border border-slate-200 bg-white dark:border-slate-800 dark:bg-slate-900">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-brand-600"></div>
-        </div>
-      ) : documents.length === 0 ? (
-        <div className="rounded-2xl border border-dashed border-slate-300 bg-white p-12 text-center dark:border-slate-800 dark:bg-slate-900">
-          <FolderLock className="mx-auto h-12 w-12 text-slate-400" />
-          <h3 className="mt-4 text-base font-semibold text-slate-900 dark:text-white">Document Vault Empty</h3>
-          <p className="mt-1 text-sm text-slate-500">
-            Deposit audit contracts, vendor invoices, tax filings, or bank statements for secure multi-tenant archiving.
-          </p>
-        </div>
-      ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {documents.map((doc) => (
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+        {documents.length === 0 ? (
+          <div className="col-span-full rounded-2xl border border-slate-200 bg-white p-12 text-center text-xs text-slate-400 dark:border-slate-800 dark:bg-slate-900">
+            No vault documents found. Click "Upload Document" to store contracts, tax forms, or receipts.
+          </div>
+        ) : (
+          documents.map((doc) => (
             <div
               key={doc._id}
-              className="flex flex-col justify-between rounded-2xl border border-slate-200 bg-white p-5 shadow-sm hover:shadow-md transition-all dark:border-slate-800 dark:bg-slate-900"
+              className="flex flex-col justify-between rounded-2xl border border-slate-200 bg-white p-5 shadow-xs transition-all hover:border-slate-300 dark:border-slate-800 dark:bg-slate-900"
             >
-              <div>
+              <div className="space-y-3">
                 <div className="flex items-start justify-between">
-                  <span className="inline-block rounded-md bg-slate-100 px-2 py-0.5 text-[11px] font-semibold text-slate-600 dark:bg-slate-800 dark:text-slate-300">
+                  <div className="flex items-center gap-2.5">
+                    <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-brand-50 text-brand-600 dark:bg-brand-950/60 dark:text-brand-400">
+                      <FileText className="h-5 w-5" />
+                    </div>
+                    <div>
+                      <h4 className="font-bold text-sm text-slate-900 dark:text-white line-clamp-1">
+                        {doc.title}
+                      </h4>
+                      <span className="text-[10px] text-slate-400 font-mono block">
+                        {(doc.fileSize / 1024).toFixed(1)} KB • {doc.mimeType?.split('/')[1]?.toUpperCase() || 'FILE'}
+                      </span>
+                    </div>
+                  </div>
+                  <span className="rounded bg-slate-100 px-2 py-0.5 text-[10px] font-semibold text-slate-600 dark:bg-slate-800 dark:text-slate-300">
                     {doc.category}
                   </span>
-                  <span className="text-[11px] text-slate-400">
-                    {Math.round((doc.fileSize / 1024) * 10) / 10} KB
-                  </span>
                 </div>
 
-                <div className="mt-3 flex items-start gap-3">
-                  <div className="rounded-xl bg-blue-50 p-2.5 text-blue-600 dark:bg-blue-950/50 dark:text-blue-400 shrink-0">
-                    <FileText className="h-5 w-5" />
-                  </div>
-                  <div>
-                    <h3 className="text-sm font-bold text-slate-900 dark:text-white leading-tight">
-                      {doc.title}
-                    </h3>
-                    <p className="text-xs text-slate-400 mt-0.5 truncate max-w-[200px]">
-                      {doc.originalFileName}
-                    </p>
-                  </div>
-                </div>
+                {doc.notes && (
+                  <p className="text-xs text-slate-500 dark:text-slate-400 line-clamp-2">
+                    {doc.notes}
+                  </p>
+                )}
 
-                {doc.notes && <p className="mt-3 text-xs text-slate-500 line-clamp-2">{doc.notes}</p>}
-
-                {/* Tags */}
                 {doc.tags?.length > 0 && (
-                  <div className="mt-3 flex flex-wrap gap-1">
-                    {doc.tags.map((t, i) => (
+                  <div className="flex flex-wrap gap-1.5 pt-1">
+                    {doc.tags.map((tg, i) => (
                       <span
                         key={i}
-                        className="rounded-md bg-slate-50 px-1.5 py-0.5 text-[10px] font-medium text-slate-600 dark:bg-slate-800/60 dark:text-slate-400"
+                        className="rounded-full bg-slate-100 px-2 py-0.5 text-[10px] text-slate-500 dark:bg-slate-800 dark:text-slate-400"
                       >
-                        #{t}
+                        #{tg}
                       </span>
                     ))}
                   </div>
                 )}
               </div>
 
-              {/* Action Buttons */}
-              <div className="mt-5 pt-3 border-t border-slate-100 dark:border-slate-800 flex items-center justify-between">
-                <span className="text-[11px] text-slate-400">
+              <div className="flex items-center justify-between border-t border-slate-100 pt-3 mt-4 dark:border-slate-800 text-xs">
+                <span className="text-[10px] text-slate-400">
                   {new Date(doc.createdAt).toLocaleDateString()}
                 </span>
-
                 <div className="flex items-center gap-2">
                   <button
-                    onClick={() => handleDownload(doc)}
-                    className="inline-flex items-center gap-1 rounded-lg bg-slate-100 px-2.5 py-1 text-xs font-semibold text-slate-700 hover:bg-slate-200 dark:bg-slate-800 dark:text-slate-200"
+                    onClick={() => handleDownload(doc._id, doc.originalFileName)}
+                    className="flex items-center gap-1 rounded px-2 py-1 text-brand-600 hover:bg-brand-50 dark:hover:bg-brand-950 font-semibold cursor-pointer"
                   >
-                    <Download className="h-3.5 w-3.5" />
-                    <span>Download</span>
+                    <Download className="h-3.5 w-3.5" /> Download
                   </button>
                   <button
                     onClick={() => handleDelete(doc._id)}
-                    className="rounded-lg p-1 text-slate-400 hover:bg-red-50 hover:text-red-600 dark:hover:bg-red-950/50"
+                    className="rounded p-1 text-slate-400 hover:text-rose-600 cursor-pointer"
                   >
-                    <Trash2 className="h-4 w-4" />
+                    <Trash2 className="h-3.5 w-3.5" />
                   </button>
                 </div>
               </div>
             </div>
-          ))}
-        </div>
-      )}
+          ))
+        )}
+      </div>
 
-      {/* Modal: Upload Document */}
+      {/* Upload Modal */}
       {showUploadModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 p-4 backdrop-blur-sm">
-          <div className="w-full max-w-lg rounded-2xl bg-white p-6 shadow-xl dark:bg-slate-900 border border-slate-200 dark:border-slate-800">
-            <div className="flex items-center justify-between border-b border-slate-100 pb-4 dark:border-slate-800">
-              <h2 className="text-lg font-bold text-slate-900 dark:text-white">Deposit File to Secure Vault</h2>
-              <button
-                onClick={() => setShowUploadModal(false)}
-                className="rounded-lg p-1 text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800"
-              >
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 p-4 backdrop-blur-xs">
+          <div className="w-full max-w-md rounded-2xl border border-slate-200 bg-white p-6 shadow-2xl dark:border-slate-800 dark:bg-slate-900">
+            <div className="flex items-center justify-between border-b border-slate-100 pb-3 dark:border-slate-800">
+              <h3 className="font-bold text-slate-900 dark:text-white">Upload to Secure Vault</h3>
+              <button onClick={() => setShowUploadModal(false)} className="text-slate-400 hover:text-slate-700">
                 <X className="h-5 w-5" />
               </button>
             </div>
 
-            <form onSubmit={handleUpload} className="mt-4 space-y-4">
+            <form onSubmit={handleUpload} className="space-y-3 mt-4 text-xs">
               <div>
-                <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300">File Attachment</label>
+                <label className="block font-semibold text-slate-700 dark:text-slate-300 mb-1">
+                  Document File *
+                </label>
                 <input
                   type="file"
                   required
-                  onChange={(e) => setUploadFile(e.target.files[0])}
-                  className="mt-1 block w-full text-xs text-slate-500 file:mr-4 file:py-2 file:px-4 file:rounded-xl file:border-0 file:text-xs file:font-semibold file:bg-brand-50 file:text-brand-700 hover:file:bg-brand-100 dark:file:bg-brand-950 dark:file:text-brand-300"
+                  onChange={(e) => {
+                    if (e.target.files && e.target.files[0]) {
+                      setFile(e.target.files[0]);
+                      if (!docTitle) setDocTitle(e.target.files[0].name.replace(/\.[^/.]+$/, ''));
+                    }
+                  }}
+                  className="w-full rounded-lg border border-slate-200 p-2 dark:border-slate-800 dark:bg-slate-800 dark:text-white"
                 />
               </div>
 
               <div>
-                <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300">Document Title</label>
+                <label className="block font-semibold text-slate-700 dark:text-slate-300 mb-1">
+                  Document Title
+                </label>
                 <input
                   type="text"
-                  placeholder="e.g. FY2025-26 Advance Tax Receipt"
-                  value={formData.title}
-                  onChange={(e) => setFormData({ ...formData, title: e.target.value })}
-                  className="mt-1 block w-full rounded-xl border border-slate-200 px-3 py-2 text-sm text-slate-900 focus:border-brand-500 focus:outline-none dark:border-slate-700 dark:bg-slate-800 dark:text-white"
+                  placeholder="e.g. FY 2025-26 Tax Audit Certificate"
+                  value={docTitle}
+                  onChange={(e) => setDocTitle(e.target.value)}
+                  className="w-full rounded-lg border border-slate-200 px-3 py-2 dark:border-slate-800 dark:bg-slate-800 dark:text-white"
                 />
-              </div>
-
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300">Category</label>
-                  <select
-                    value={formData.category}
-                    onChange={(e) => setFormData({ ...formData, category: e.target.value })}
-                    className="mt-1 block w-full rounded-xl border border-slate-200 px-3 py-2 text-sm text-slate-900 focus:border-brand-500 focus:outline-none dark:border-slate-700 dark:bg-slate-800 dark:text-white"
-                  >
-                    <option value="Bank Statement">Bank Statement</option>
-                    <option value="Invoice">Invoice</option>
-                    <option value="Receipt">Receipt</option>
-                    <option value="Tax Document">Tax Document</option>
-                    <option value="Legal Contract">Legal Contract</option>
-                    <option value="Other">Other</option>
-                  </select>
-                </div>
-
-                <div>
-                  <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300">Tags (comma separated)</label>
-                  <input
-                    type="text"
-                    placeholder="audit, q4, hdfc"
-                    value={formData.tags}
-                    onChange={(e) => setFormData({ ...formData, tags: e.target.value })}
-                    className="mt-1 block w-full rounded-xl border border-slate-200 px-3 py-2 text-sm text-slate-900 focus:border-brand-500 focus:outline-none dark:border-slate-700 dark:bg-slate-800 dark:text-white"
-                  />
-                </div>
               </div>
 
               <div>
-                <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300">Notes</label>
-                <textarea
-                  rows="2"
-                  placeholder="Optional retention notes..."
-                  value={formData.notes}
-                  onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
-                  className="mt-1 block w-full rounded-xl border border-slate-200 px-3 py-2 text-sm text-slate-900 focus:border-brand-500 focus:outline-none dark:border-slate-700 dark:bg-slate-800 dark:text-white"
+                <label className="block font-semibold text-slate-700 dark:text-slate-300 mb-1">
+                  Category
+                </label>
+                <select
+                  value={docCategory}
+                  onChange={(e) => setDocCategory(e.target.value)}
+                  className="w-full rounded-lg border border-slate-200 px-3 py-2 dark:border-slate-800 dark:bg-slate-800 dark:text-white"
+                >
+                  {CATEGORIES.filter((c) => c !== 'All').map((c) => (
+                    <option key={c} value={c}>{c}</option>
+                  ))}
+                </select>
+              </div>
+
+              <div>
+                <label className="block font-semibold text-slate-700 dark:text-slate-300 mb-1">
+                  Tags (comma separated)
+                </label>
+                <input
+                  type="text"
+                  placeholder="audit, fy26, compliance"
+                  value={docTags}
+                  onChange={(e) => setDocTags(e.target.value)}
+                  className="w-full rounded-lg border border-slate-200 px-3 py-2 dark:border-slate-800 dark:bg-slate-800 dark:text-white"
                 />
               </div>
 
-              <div className="flex justify-end gap-3 pt-3 border-t border-slate-100 dark:border-slate-800">
+              <div>
+                <label className="block font-semibold text-slate-700 dark:text-slate-300 mb-1">
+                  Notes / Audit Remarks
+                </label>
+                <textarea
+                  rows={2}
+                  placeholder="Optional context about this file..."
+                  value={docNotes}
+                  onChange={(e) => setDocNotes(e.target.value)}
+                  className="w-full rounded-lg border border-slate-200 px-3 py-2 dark:border-slate-800 dark:bg-slate-800 dark:text-white"
+                />
+              </div>
+
+              <div className="flex justify-end gap-2 pt-3">
                 <button
                   type="button"
                   onClick={() => setShowUploadModal(false)}
-                  className="rounded-xl border border-slate-200 px-4 py-2 text-sm font-semibold text-slate-600 hover:bg-slate-50 dark:border-slate-700 dark:text-slate-300"
+                  className="rounded-lg px-3 py-2 text-slate-600 hover:bg-slate-100 dark:text-slate-300"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
                   disabled={uploading}
-                  className="rounded-xl bg-brand-600 px-4 py-2 text-sm font-semibold text-white shadow-sm hover:bg-brand-500"
+                  className="rounded-lg bg-brand-600 px-4 py-2 font-semibold text-white hover:bg-brand-500 disabled:opacity-50 cursor-pointer"
                 >
-                  {uploading ? 'Encrypting & Storing...' : 'Deposit Document'}
+                  {uploading ? 'Encrypting & Uploading...' : 'Upload File'}
                 </button>
               </div>
             </form>

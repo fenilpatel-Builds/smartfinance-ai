@@ -215,3 +215,4 @@ export const updateAnomalyStatus = async (req, res, next) => {
     next(err);
   }
 };
+

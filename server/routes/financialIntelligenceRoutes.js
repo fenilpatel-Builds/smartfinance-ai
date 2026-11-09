@@ -15,6 +15,9 @@ router.use(requireAuth, attachWorkspace);
 router.get('/forecast', requireWorkspacePermission('viewer'), getCashFlowForecast);
 router.get('/health-score', requireWorkspacePermission('viewer'), getFinancialHealthScore);
 router.get('/currency/rates', requireWorkspacePermission('viewer'), getCurrencyRates);
+router.get('/rates', requireWorkspacePermission('viewer'), getCurrencyRates);
 router.post('/currency/convert', requireWorkspacePermission('viewer'), convertCurrency);
+router.post('/convert', requireWorkspacePermission('viewer'), convertCurrency);
 
 export default router;
+

@@ -22,3 +22,4 @@ router.post('/:id/payment', requireWorkspacePermission('editor'), recordPayment)
 router.delete('/:id', requireWorkspacePermission('editor'), deleteInvoice);
 
 export default router;
+

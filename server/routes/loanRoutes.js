@@ -20,3 +20,4 @@ router.post('/:id/payment', requireWorkspacePermission('editor'), recordLoanPaym
 router.delete('/:id', requireWorkspacePermission('editor'), deleteLoan);
 
 export default router;
+

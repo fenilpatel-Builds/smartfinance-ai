@@ -93,3 +93,4 @@ invoiceSchema.index({ workspaceId: 1, invoiceNumber: 1 });
 invoiceSchema.index({ workspaceId: 1, dueDate: 1 });
 
 export default mongoose.model('Invoice', invoiceSchema);
+
