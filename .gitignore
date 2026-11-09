@@ -1,21 +1,83 @@
+# Dependencies
 node_modules/
+.pnp
+.pnp.js
+
+# Environment and Credentials (strictly never commit secrets)
 .env
 .env.local
+.env.development
+.env.test
+.env.production
+.env*.local
+!.env.example
+!.env.production.example
+!client/.env.example
+!server/.env.example
+!python-service/.env.example
+
+# Production Builds and Bundles
 dist/
 build/
-*.log
-uploads/
-temp/
+*.tsbuildinfo
+
+# Python Runtime Artifacts
 __pycache__/
 *.py[cod]
 *$py.class
+.Python
 .venv/
 venv/
 ENV/
-.DS_Store
-Thumbs.db
+env/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+
+# Testing and Coverage
+coverage/
+.nyc_output/
+.pytest_cache/
+
+# Temporary and Upload Files
+uploads/
+temp/
+tmp/
+*.tmp
+
+# Local Database Files and Backup Archives
 server/data/
 server/backups/
+backups/
+*.db
+*.sqlite
+*.sqlite3
+
+# Logs
+logs/
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# IDE and OS Metadata
+.vscode/
+.idea/
+*.sublime-project
+*.sublime-workspace
+.DS_Store
+Thumbs.db
+Desktop.ini
 *.lock
-
-
